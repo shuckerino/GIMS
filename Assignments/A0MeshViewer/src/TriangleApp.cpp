@@ -51,6 +51,7 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
 
   createRootSignature();
   createPipeline();
+  createWireFramePipeline();
   createConstantBufferForEachSwapchainFrame();
   m_examinerController.setTranslationVector(f32v3(0, 0, 3));
 
@@ -109,7 +110,7 @@ void MeshViewer::updateConstantBuffer()
 
   f32m4 viewMatrix = m_examinerController.getTransformationMatrix();
 
-  f32m4 projMatrix = glm::perspectiveFovLH_ZO(glm::radians(45.0f), m_uiData.m_width, m_uiData.m_height, 0.0f, 100.0f);
+  f32m4 projMatrix = glm::perspectiveFovLH_ZO(glm::radians(30.0f), m_uiData.m_width, m_uiData.m_height, 0.0f, 100.0f);
   const auto vp    = viewMatrix * projMatrix;
 
   // MVP matrix
@@ -124,7 +125,6 @@ void MeshViewer::updateConstantBuffer()
 
 void MeshViewer::createPipeline()
 {
-  // TODO: maybe add other shaders as well?
   const auto vertexShader =
       compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_main", L"vs_6_0");
 
@@ -163,6 +163,42 @@ void MeshViewer::createPipeline()
   throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 }
 
+void MeshViewer::createWireFramePipeline()
+{
+  const auto vertexShader =
+      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_WireFrame_main", L"vs_6_0");
+
+  const auto pixelShader =
+      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"PS_WireFrame_main", L"ps_6_0");
+
+  D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
+      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+  ;
+
+  D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+  psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
+  psoDesc.pRootSignature                     = m_rootSignature.Get();
+  psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
+  psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
+  psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+  psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_NONE;
+  psoDesc.RasterizerState.FillMode           = D3D12_FILL_MODE_WIREFRAME;
+  psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+  psoDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+  psoDesc.SampleMask                         = UINT_MAX;
+  psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+  psoDesc.NumRenderTargets                   = 1;
+  psoDesc.SampleDesc.Count                   = 1;
+  psoDesc.RTVFormats[0]                      = getRenderTarget()->GetDesc().Format;
+  psoDesc.DSVFormat                          = getDepthStencil()->GetDesc().Format;
+  psoDesc.DepthStencilState.DepthEnable      = FALSE;
+  psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
+  psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ZERO;
+  psoDesc.DepthStencilState.StencilEnable    = FALSE;
+
+  throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_wireFramePipelineState)));
+}
+
 void MeshViewer::initializeVertexBuffer(const CograBinaryMeshFile* cbm)
 {
   const auto numVertices   = cbm->getNumVertices();
@@ -188,22 +224,21 @@ void MeshViewer::uploadVertexBufferToGPU()
 {
   //// apply transformation
   // //f32m4 T = getNormalizationTransformation(m_VertexBufferCPU.data(), m_VertexBufferCPU.size());
-  //f32m4 viewMatrix = m_examinerController.getTransformationMatrix();
+  // f32m4 viewMatrix = m_examinerController.getTransformationMatrix();
 
   //// Projection matrix - perspective projection for 3D depth
   //// float aspectRatio = static_cast<float>(getViewport().Width) / static_cast<float>(getViewport().Height);
   ////f32   aspectRatio = m_uiData.m_width / m_uiData.m_height;
 
   ////f32m4 projMatrix  = glm::perspective(glm::radians(90.0f), aspectRatio, 0.1f, 100.0f);
-  //f32m4 projMatrix = glm::perspectiveFovLH_ZO(glm::radians(90.0f), m_uiData.m_width, m_uiData.m_height, 0.0f, 100.0f);
-  //const auto vp                 = viewMatrix * projMatrix;
-  //const auto temp_vertex_buffer = m_VertexBufferCPU;
-  //for (ui32 i = 0; i < m_VertexBufferCPU.size(); i++)
+  // f32m4 projMatrix = glm::perspectiveFovLH_ZO(glm::radians(90.0f), m_uiData.m_width, m_uiData.m_height, 0.0f,
+  // 100.0f); const auto vp                 = viewMatrix * projMatrix; const auto temp_vertex_buffer =
+  // m_VertexBufferCPU; for (ui32 i = 0; i < m_VertexBufferCPU.size(); i++)
   //{
-  //  //f32m4 normalizationTransformation =
-  //  //    getNormalizationTransformation(&m_VertexBufferCPU.at(i).position, )
-  //  m_VertexBufferCPU.at(i).position = vp * f32v4(m_VertexBufferCPU.at(i).position, 1.0f);
-  //}
+  //   //f32m4 normalizationTransformation =
+  //   //    getNormalizationTransformation(&m_VertexBufferCPU.at(i).position, )
+  //   m_VertexBufferCPU.at(i).position = vp * f32v4(m_VertexBufferCPU.at(i).position, 1.0f);
+  // }
 
   UploadHelper uploadHelper(getDevice(), m_vertexBufferSize);
 
@@ -221,7 +256,7 @@ void MeshViewer::uploadVertexBufferToGPU()
   m_vertexBufferView.SizeInBytes    = static_cast<ui32>(m_vertexBufferSize);
   m_vertexBufferView.StrideInBytes  = sizeof(Vertex);
 
-  //m_VertexBufferCPU = temp_vertex_buffer;
+  // m_VertexBufferCPU = temp_vertex_buffer;
 }
 
 void MeshViewer::initializeIndexBuffer(const CograBinaryMeshFile* cbm)
@@ -261,7 +296,7 @@ MeshViewer::~MeshViewer()
 
 void MeshViewer::onDraw()
 {
-  //uploadVertexBufferToGPU();
+  // uploadVertexBufferToGPU();
   if (!ImGui::GetIO().WantCaptureMouse)
   {
     bool pressed  = ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
@@ -309,22 +344,29 @@ void MeshViewer::onDraw()
   updateConstantBuffer();
 
   commandList->DrawIndexedInstanced(static_cast<ui32>(m_indexBuffer.size()), 1, 0, 0, 0);
+
+  if (m_uiData.wireFrameEnabled)
+  {
+    commandList->SetPipelineState(m_wireFramePipelineState.Get());
+    commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    commandList->DrawIndexedInstanced(static_cast<ui32>(m_indexBuffer.size()), 1, 0, 0, 0);
+
+  }
 }
 
 void MeshViewer::onDrawUI()
 {
   const auto imGuiFlags = m_examinerController.active() ? ImGuiWindowFlags_NoInputs : ImGuiWindowFlags_None;
-  // TODO Implement me!
   ImGui::Begin("Information", nullptr, imGuiFlags);
   ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
+  ImGui::Checkbox("Enable wireframe", &m_uiData.wireFrameEnabled);
   ImGui::End();
 
   m_uiData.m_height = ImGui::GetMainViewport()->WorkSize.y;
   m_uiData.m_width  = ImGui::GetMainViewport()->WorkSize.x;
 
-  ImGui::Begin("Information", nullptr, imGuiFlags);
-  ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
-  ImGui::End();
+  // wireframe checkbox
 
   // std::cout << m_uiData.m_height << std::endl;
   // std::cout << m_uiData.m_width << std::endl;

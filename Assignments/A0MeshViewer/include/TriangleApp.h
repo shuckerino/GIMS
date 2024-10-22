@@ -21,6 +21,7 @@ private:
     f32v3 m_backgroundColor = f32v3(0.25f, 0.25f, 0.25f);
     f32   m_width;
     f32   m_height;
+    bool  wireFrameEnabled;
     // TODO Implement me!
   };
   struct Vertex
@@ -48,7 +49,10 @@ private:
   ComPtr<ID3D12Resource>              m_vertexBufferGPU;
 
   ComPtr<ID3D12RootSignature>         m_rootSignature;
+
   ComPtr<ID3D12PipelineState>         m_pipelineState;
+  ComPtr<ID3D12PipelineState>         m_wireFramePipelineState;
+
   std::vector<ComPtr<ID3D12Resource>> m_constantBuffers;
 
   std::vector<ui32>                   m_indexBuffer;
@@ -62,6 +66,7 @@ private:
   void createConstantBufferForEachSwapchainFrame();
   void updateConstantBuffer();
   void createPipeline();
+  void createWireFramePipeline();
   void initializeVertexBuffer(const CograBinaryMeshFile* cbm);
   void uploadVertexBufferToGPU();
   void initializeIndexBuffer(const CograBinaryMeshFile* cbm);
