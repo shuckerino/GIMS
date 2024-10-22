@@ -19,7 +19,7 @@ cbuffer PerFrameConstants : register(b0)
     //float4 specularColor_and_Exponent;
     //float4 ambientColor;
     //float4 diffuseColor;
-    //float4 wireFrameColor;
+    float4 wireFrameColor;
     //uint1 flags;
 }
 
@@ -84,6 +84,6 @@ VertexShaderOutput_Wireframe VS_WireFrame_main(float3 position : POSITION/*, flo
 float4 PS_WireFrame_main(VertexShaderOutput_Wireframe input)
     : SV_TARGET
 {
-    //return wireFrameColor;
-    return float4(0.0f, 0.0f, 0.0f, 1.0f);
+    return wireFrameColor;
+    //return float4(0.0f, 0.0f, 0.0f, 1.0f);
 }

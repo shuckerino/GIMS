@@ -48,6 +48,9 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
   // set ui data
   m_uiData.m_height = static_cast<f32>(config.height);
   m_uiData.m_width  = static_cast<f32>(config.width);
+  m_uiData.m_backgroundColor = f32v4(1.f, 1.f, 1.f, 1.0f);
+  m_uiData.m_wireFrameColor = f32v4(0.0f, 0.0f, 0.0f, 1.0f);
+  m_uiData.m_wireFrameEnabled = true;
 
   createRootSignature();
   createPipeline();
@@ -107,6 +110,9 @@ void MeshViewer::createConstantBufferForEachSwapchainFrame()
 void MeshViewer::updateConstantBuffer()
 {
   ConstantBuffer cb;
+
+  // update UI data
+  cb.wireFrameColor = m_uiData.m_wireFrameColor;
 
   f32m4 viewMatrix = m_examinerController.getTransformationMatrix();
 
@@ -345,22 +351,24 @@ void MeshViewer::onDraw()
 
   commandList->DrawIndexedInstanced(static_cast<ui32>(m_indexBuffer.size()), 1, 0, 0, 0);
 
-  if (m_uiData.wireFrameEnabled)
+  if (m_uiData.m_wireFrameEnabled)
   {
     commandList->SetPipelineState(m_wireFramePipelineState.Get());
     commandList->SetGraphicsRootSignature(m_rootSignature.Get());
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->DrawIndexedInstanced(static_cast<ui32>(m_indexBuffer.size()), 1, 0, 0, 0);
-
   }
 }
 
 void MeshViewer::onDrawUI()
 {
   const auto imGuiFlags = m_examinerController.active() ? ImGuiWindowFlags_NoInputs : ImGuiWindowFlags_None;
-  ImGui::Begin("Information", nullptr, imGuiFlags);
+  ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
-  ImGui::Checkbox("Enable wireframe", &m_uiData.wireFrameEnabled);
+  ImGui::ColorEdit4("Background color", &m_uiData.m_backgroundColor.x);
+  ImGui::Checkbox("Overlay wireframe", &m_uiData.m_wireFrameEnabled);
+  ImGui::Checkbox("Back-face culling", &m_uiData.m_backFaceCullingEnabled);
+  ImGui::ColorEdit4("Wireframe Color", &m_uiData.m_wireFrameColor.x);
   ImGui::End();
 
   m_uiData.m_height = ImGui::GetMainViewport()->WorkSize.y;

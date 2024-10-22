@@ -18,11 +18,12 @@ public:
 private:
   struct UiData
   {
-    f32v3 m_backgroundColor = f32v3(0.25f, 0.25f, 0.25f);
+    f32v3 m_backgroundColor;
+    f32v4 m_wireFrameColor;
     f32   m_width;
     f32   m_height;
-    bool  wireFrameEnabled;
-    // TODO Implement me!
+    bool  m_wireFrameEnabled;
+    bool  m_backFaceCullingEnabled;
   };
   struct Vertex
   {
@@ -37,7 +38,7 @@ private:
     //f32v4 specularColor_and_Exponent;
     //f32v4 ambientColor;
     //f32v4 diffuseColor;
-    //f32v4 wireFrameColor;
+    f32v4 wireFrameColor;
     //ui32  flags;
   };
 
