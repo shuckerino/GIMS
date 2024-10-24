@@ -19,16 +19,21 @@ private:
   struct UiData
   {
     f32v3 m_backgroundColor;
-    f32v4 m_wireFrameColor;
-    f32   m_width;
-    f32   m_height;
+    f32v3 m_wireFrameColor;
+    f32v3 m_ambientColor;
+    f32v3 m_diffuseColor;
+    f32v3 m_specularColor;
+    f32   m_viewPortWidth;
+    f32   m_viewPortHeight;
     bool  m_wireFrameEnabled;
     bool  m_backFaceCullingEnabled;
+    bool  m_twoSidedLightingEnabled;
+    bool  m_useTextureEnabled;
   };
   struct Vertex
   {
     f32v3 position;
-    //f32v3 normal;   // Normal vector
+    f32v3 normal;   // Normal vector
     //f32v2 texcoord; // Texture coordinates
   };
   struct ConstantBuffer
@@ -65,11 +70,15 @@ private:
 
   void createRootSignature();
   void createConstantBufferForEachSwapchainFrame();
-  void updateConstantBuffer();
   void createPipeline();
   void createWireFramePipeline();
+
   void initializeVertexBuffer(const CograBinaryMeshFile* cbm);
-  void uploadVertexBufferToGPU();
   void initializeIndexBuffer(const CograBinaryMeshFile* cbm);
+
+  void uploadVertexBufferToGPU();
   void uploadIndexBufferToGPU();
+
+  void updateConstantBuffer();
+  void updateUIData(ConstantBuffer* cb);
 };

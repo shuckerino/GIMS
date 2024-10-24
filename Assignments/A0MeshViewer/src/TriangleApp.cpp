@@ -46,10 +46,10 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
     , m_examinerController(true)
 {
   // set ui data
-  m_uiData.m_height = static_cast<f32>(config.height);
-  m_uiData.m_width  = static_cast<f32>(config.width);
-  m_uiData.m_backgroundColor = f32v4(1.f, 1.f, 1.f, 1.0f);
-  m_uiData.m_wireFrameColor = f32v4(0.0f, 0.0f, 0.0f, 1.0f);
+  m_uiData.m_viewPortHeight   = static_cast<f32>(config.height);
+  m_uiData.m_viewPortWidth    = static_cast<f32>(config.width);
+  m_uiData.m_backgroundColor  = f32v4(1.f, 1.f, 1.f, 1.0f);
+  m_uiData.m_wireFrameColor   = f32v4(0.5f, 1.f, 0.0f, 1.0f);
   m_uiData.m_wireFrameEnabled = true;
 
   createRootSignature();
@@ -110,14 +110,19 @@ void MeshViewer::createConstantBufferForEachSwapchainFrame()
 void MeshViewer::updateConstantBuffer()
 {
   ConstantBuffer cb;
+  std::cout << "Wireframe color is" << to_string(m_uiData.m_wireFrameColor) << std::endl;
+  // cb.wireFrameColor = f32v4(m_uiData.m_wireFrameColor, 1.0f);
+  updateUIData(&cb);
 
-  // update UI data
-  cb.wireFrameColor = m_uiData.m_wireFrameColor;
+  const auto pos_pointer = &m_VertexBufferCPU.data()->position;
+  f32m4      modelMatrix = getNormalizationTransformation(pos_pointer, static_cast<ui32>(m_VertexBufferCPU.size()),
+                                                          m_uiData.m_viewPortWidth, m_uiData.m_viewPortHeight);
 
   f32m4 viewMatrix = m_examinerController.getTransformationMatrix();
 
-  f32m4 projMatrix = glm::perspectiveFovLH_ZO(glm::radians(30.0f), m_uiData.m_width, m_uiData.m_height, 0.0f, 100.0f);
-  const auto vp    = viewMatrix * projMatrix;
+  f32m4 projMatrix =
+      glm::perspectiveFovLH_ZO(glm::radians(30.0f), m_uiData.m_viewPortWidth, m_uiData.m_viewPortHeight, 0.0f, 100.0f);
+  const auto mvp = modelMatrix * viewMatrix * projMatrix;
 
   // MVP matrix
   cb.mvp = projMatrix * viewMatrix;
@@ -127,6 +132,13 @@ void MeshViewer::updateConstantBuffer()
   currentConstantBuffer->Map(0, nullptr, &p);
   ::memcpy(p, &cb, sizeof(cb));
   currentConstantBuffer->Unmap(0, nullptr);
+}
+
+void MeshViewer::updateUIData(ConstantBuffer* cb)
+{
+  cb->wireFrameColor = f32v4(m_uiData.m_wireFrameColor, 1.0f);
+  // cb->diffuseColor   = f32v4(m_uiData.m_diffuseColor, 1.0f);
+  // cb->ambientColor   = f32v4(m_uiData.m_ambientColor, 1.0f);
 }
 
 void MeshViewer::createPipeline()
@@ -223,6 +235,28 @@ void MeshViewer::initializeVertexBuffer(const CograBinaryMeshFile* cbm)
     m_VertexBufferCPU.push_back(v);
     // m_VertexBufferCPU.push_back({{vertexPointer[i], vertexPointer[i + 1], vertexPointer[i + 2]}});
   }
+
+  for (size_t i = 0; i < m_VertexBufferCPU.size(); i += 3)
+  {
+    // get vertex position for triangle face
+    const auto p0 = m_VertexBufferCPU[i].position;
+    const auto p1 = m_VertexBufferCPU[i + 1].position;
+    const auto p2 = m_VertexBufferCPU[i + 2].position;
+
+    // compute two edges
+    const auto firstEdge = p0 - p1;
+    const auto secondEdge = p0 - p2;
+
+    // compute normal by using cross product
+    const auto triangeleFaceNormal = glm::normalize(glm::cross(firstEdge, secondEdge));
+
+    m_VertexBufferCPU[i].normal = triangeleFaceNormal;
+    m_VertexBufferCPU[i + 1].normal = triangeleFaceNormal;
+    m_VertexBufferCPU[i + 2].normal = triangeleFaceNormal;
+
+
+  }
+
   m_vertexBufferSize = m_VertexBufferCPU.size() * sizeof(Vertex);
 }
 
@@ -269,7 +303,6 @@ void MeshViewer::initializeIndexBuffer(const CograBinaryMeshFile* cbm)
 {
   const auto numIndices         = cbm->getNumTriangles() * 3;
   const auto indexBufferPointer = cbm->getTriangleIndices();
-  // m_indexBuffer                 = std::vector<ui32>(indexBufferPointer, indexBufferPointer + numIndices);
   for (ui32 i = 0; i < numIndices; i++)
   {
     m_indexBuffer.push_back(indexBufferPointer[i]);
@@ -302,6 +335,10 @@ MeshViewer::~MeshViewer()
 
 void MeshViewer::onDraw()
 {
+  if (m_uiData.m_viewPortHeight == 0 || m_uiData.m_viewPortWidth == 0)
+  {
+    return;
+  }
   // uploadVertexBufferToGPU();
   if (!ImGui::GetIO().WantCaptureMouse)
   {
@@ -354,8 +391,6 @@ void MeshViewer::onDraw()
   if (m_uiData.m_wireFrameEnabled)
   {
     commandList->SetPipelineState(m_wireFramePipelineState.Get());
-    commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->DrawIndexedInstanced(static_cast<ui32>(m_indexBuffer.size()), 1, 0, 0, 0);
   }
 }
@@ -363,23 +398,25 @@ void MeshViewer::onDraw()
 void MeshViewer::onDrawUI()
 {
   const auto imGuiFlags = m_examinerController.active() ? ImGuiWindowFlags_NoInputs : ImGuiWindowFlags_None;
-  ImGui::Begin("Configuration", nullptr, imGuiFlags);
+
+  m_uiData.m_viewPortHeight = ImGui::GetMainViewport()->WorkSize.y;
+  m_uiData.m_viewPortWidth  = ImGui::GetMainViewport()->WorkSize.x;
+
+  // Information window
+  ImGui::Begin("Information", nullptr, imGuiFlags);
   ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
-  ImGui::ColorEdit4("Background color", &m_uiData.m_backgroundColor.x);
-  ImGui::Checkbox("Overlay wireframe", &m_uiData.m_wireFrameEnabled);
-  ImGui::Checkbox("Back-face culling", &m_uiData.m_backFaceCullingEnabled);
-  ImGui::ColorEdit4("Wireframe Color", &m_uiData.m_wireFrameColor.x);
   ImGui::End();
 
-  m_uiData.m_height = ImGui::GetMainViewport()->WorkSize.y;
-  m_uiData.m_width  = ImGui::GetMainViewport()->WorkSize.x;
-
-  // wireframe checkbox
-
-  // std::cout << m_uiData.m_height << std::endl;
-  // std::cout << m_uiData.m_width << std::endl;
+  // Configuration window
+  ImGui::Begin("Configuration", nullptr, imGuiFlags);
+  ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor.x);
+  ImGui::Checkbox("Back-Face Culling", &m_uiData.m_backFaceCullingEnabled);
+  ImGui::Checkbox("Overlay Wireframe", &m_uiData.m_wireFrameEnabled);
+  ImGui::ColorEdit3("Wireframe Color", &m_uiData.m_wireFrameColor.x);
+  ImGui::Checkbox("Two-Sided Lighting", &m_uiData.m_twoSidedLightingEnabled);
+  ImGui::Checkbox("Use Texture", &m_uiData.m_useTextureEnabled);
+  ImGui::ColorEdit3("Ambient", &m_uiData.m_ambientColor.x);
+  ImGui::ColorEdit3("Diffuse", &m_uiData.m_diffuseColor.x);
+  ImGui::ColorEdit3("Specular", &m_uiData.m_specularColor.x);
+  ImGui::End();
 }
-
-// TODO Implement me!
-// That is a hell lot of code :-)
-// Enjoy!
