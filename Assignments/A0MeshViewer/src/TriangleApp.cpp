@@ -36,10 +36,10 @@ f32m4 getNormalizationTransformation(f32v3 const* const positions, ui32 nPositio
   f32m4 translation = glm::translate(glm::mat4(1.0f), -centerOfMass);
 
   // find largest dimension and scale accordingly
-  const f32v3 distance      = maxPos - minPos;
-  const f32        largestDimension = glm::max(distance.x, glm::max(distance.y, distance.z));
-  const f32 scalingFactor    = (largestDimension != 0) ? (1.0f / largestDimension) : 1.0f;
-  f32m4 scale_matrix = glm::scale(glm::mat4(1.0f), f32v3(scalingFactor));
+  const f32v3 distance         = maxPos - minPos;
+  const f32   largestDimension = glm::max(distance.x, glm::max(distance.y, distance.z));
+  const f32   scalingFactor    = (largestDimension != 0) ? (1.0f / largestDimension) : 1.0f;
+  f32m4       scale_matrix     = glm::scale(glm::mat4(1.0f), f32v3(scalingFactor));
 
   // Combine translation and scaling
   f32m4 normalizationMatrix = scale_matrix * translation;
@@ -55,8 +55,12 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
   // set ui data
   m_uiData.m_viewPortHeight   = static_cast<f32>(config.height);
   m_uiData.m_viewPortWidth    = static_cast<f32>(config.width);
-  m_uiData.m_backgroundColor  = f32v4(1.f, 1.f, 1.f, 1.0f);
-  m_uiData.m_wireFrameColor   = f32v4(0.0f, 0.f, 0.0f, 1.0f);
+  m_uiData.m_backgroundColor  = f32v4(1.0f, 1.0f, 1.0f, 1.0f);
+  m_uiData.m_wireFrameColor   = f32v4(0.0f, 0.0f, 0.0f, 1.0f);
+  m_uiData.m_ambientColor     = f32v4(0.0f, 0.0f, 0.0f, 1.0f);
+  m_uiData.m_diffuseColor     = f32v4(1.0f, 1.0f, 1.0f, 1.0f);
+  m_uiData.m_specularColor    = f32v3(1.0f, 1.0f, 1.0f);
+  m_uiData.m_exponent         = 1;
   m_uiData.m_wireFrameEnabled = true;
 
   createRootSignature();
@@ -126,7 +130,7 @@ void MeshViewer::updateConstantBuffer()
   f32m4 viewMatrix = m_examinerController.getTransformationMatrix();
 
   f32m4 projMatrix =
-      glm::perspectiveFovLH_ZO(glm::radians(30.0f), m_uiData.m_viewPortWidth, m_uiData.m_viewPortHeight, 0.0f, 100.0f);
+      glm::perspectiveFovLH_ZO(glm::radians(30.0f), m_uiData.m_viewPortWidth, m_uiData.m_viewPortHeight, 0.1f, 100.0f);
   const auto mv  = viewMatrix * modelMatrix;
   const auto mvp = projMatrix * mv;
 
@@ -143,9 +147,13 @@ void MeshViewer::updateConstantBuffer()
 
 void MeshViewer::updateUIData(ConstantBuffer* cb)
 {
-  cb->wireFrameColor = f32v4(m_uiData.m_wireFrameColor, 1.0f);
-  // cb->diffuseColor   = f32v4(m_uiData.m_diffuseColor, 1.0f);
-  // cb->ambientColor   = f32v4(m_uiData.m_ambientColor, 1.0f);
+  cb->wireFrameColor               = f32v4(m_uiData.m_wireFrameColor, 1.0f);
+  cb->ambientColor                 = f32v4(m_uiData.m_ambientColor, 1.0f);
+  cb->diffuseColor                 = f32v4(m_uiData.m_diffuseColor, 1.0f);
+  cb->specularColor_and_Exponent.x = m_uiData.m_specularColor.x;
+  cb->specularColor_and_Exponent.y = m_uiData.m_specularColor.y;
+  cb->specularColor_and_Exponent.z = m_uiData.m_specularColor.z;
+  cb->specularColor_and_Exponent.w = static_cast<f32>(m_uiData.m_exponent);
 }
 
 void MeshViewer::createPipeline()
@@ -171,19 +179,20 @@ void MeshViewer::createPipeline()
   psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
   psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
   psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-  psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_NONE;
-  psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-  psoDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-  psoDesc.SampleMask                         = UINT_MAX;
-  psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-  psoDesc.NumRenderTargets                   = 1;
-  psoDesc.SampleDesc.Count                   = 1;
-  psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
-  psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
-  psoDesc.DepthStencilState.DepthEnable      = TRUE;
-  psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
-  psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ALL;
-  psoDesc.DepthStencilState.StencilEnable    = FALSE;
+  // psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_NONE;
+  psoDesc.RasterizerState.CullMode         = D3D12_CULL_MODE_BACK;
+  psoDesc.BlendState                       = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+  psoDesc.DepthStencilState                = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+  psoDesc.SampleMask                       = UINT_MAX;
+  psoDesc.PrimitiveTopologyType            = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+  psoDesc.NumRenderTargets                 = 1;
+  psoDesc.SampleDesc.Count                 = 1;
+  psoDesc.RTVFormats[0]                    = getDX12AppConfig().renderTargetFormat;
+  psoDesc.DSVFormat                        = getDX12AppConfig().depthBufferFormat;
+  psoDesc.DepthStencilState.DepthEnable    = TRUE;
+  psoDesc.DepthStencilState.DepthFunc      = D3D12_COMPARISON_FUNC_LESS;
+  psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+  psoDesc.DepthStencilState.StencilEnable  = FALSE;
 
   throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 }
@@ -215,9 +224,9 @@ void MeshViewer::createWireFramePipeline()
   psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
   psoDesc.NumRenderTargets                   = 1;
   psoDesc.SampleDesc.Count                   = 1;
-  psoDesc.RTVFormats[0]                      = getRenderTarget()->GetDesc().Format;
-  psoDesc.DSVFormat                          = getDepthStencil()->GetDesc().Format;
-  psoDesc.DepthStencilState.DepthEnable      = FALSE;
+  psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
+  psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
+  psoDesc.DepthStencilState.DepthEnable      = TRUE;
   psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
   psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ZERO;
   psoDesc.DepthStencilState.StencilEnable    = FALSE;
@@ -407,5 +416,6 @@ void MeshViewer::onDrawUI()
   ImGui::ColorEdit3("Ambient", &m_uiData.m_ambientColor.x);
   ImGui::ColorEdit3("Diffuse", &m_uiData.m_diffuseColor.x);
   ImGui::ColorEdit3("Specular", &m_uiData.m_specularColor.x);
+  ImGui::SliderInt("Exponent", &m_uiData.m_exponent, 1, 256);
   ImGui::End();
 }
