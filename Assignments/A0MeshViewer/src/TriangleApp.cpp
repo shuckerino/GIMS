@@ -262,24 +262,6 @@ void MeshViewer::initializeVertexBuffer(const CograBinaryMeshFile* cbm)
 
 void MeshViewer::uploadVertexBufferToGPU()
 {
-  //// apply transformation
-  // //f32m4 T = getNormalizationTransformation(m_VertexBufferCPU.data(), m_VertexBufferCPU.size());
-  // f32m4 viewMatrix = m_examinerController.getTransformationMatrix();
-
-  //// Projection matrix - perspective projection for 3D depth
-  //// float aspectRatio = static_cast<float>(getViewport().Width) / static_cast<float>(getViewport().Height);
-  ////f32   aspectRatio = m_uiData.m_width / m_uiData.m_height;
-
-  ////f32m4 projMatrix  = glm::perspective(glm::radians(90.0f), aspectRatio, 0.1f, 100.0f);
-  // f32m4 projMatrix = glm::perspectiveFovLH_ZO(glm::radians(90.0f), m_uiData.m_width, m_uiData.m_height, 0.0f,
-  // 100.0f); const auto vp                 = viewMatrix * projMatrix; const auto temp_vertex_buffer =
-  // m_VertexBufferCPU; for (ui32 i = 0; i < m_VertexBufferCPU.size(); i++)
-  //{
-  //   //f32m4 normalizationTransformation =
-  //   //    getNormalizationTransformation(&m_VertexBufferCPU.at(i).position, )
-  //   m_VertexBufferCPU.at(i).position = vp * f32v4(m_VertexBufferCPU.at(i).position, 1.0f);
-  // }
-
   UploadHelper uploadHelper(getDevice(), m_vertexBufferSize);
 
   // 1. Create vertex buffer description (resource description)
@@ -295,8 +277,6 @@ void MeshViewer::uploadVertexBufferToGPU()
   m_vertexBufferView.BufferLocation = m_vertexBufferGPU->GetGPUVirtualAddress();
   m_vertexBufferView.SizeInBytes    = static_cast<ui32>(m_vertexBufferSize);
   m_vertexBufferView.StrideInBytes  = sizeof(Vertex);
-
-  // m_VertexBufferCPU = temp_vertex_buffer;
 }
 
 void MeshViewer::initializeIndexBuffer(const CograBinaryMeshFile* cbm)
