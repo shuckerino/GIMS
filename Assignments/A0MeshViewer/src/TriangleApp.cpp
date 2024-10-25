@@ -52,16 +52,18 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
     : DX12App(config)
     , m_examinerController(true)
 {
-  // set ui data
-  m_uiData.m_viewPortHeight   = static_cast<f32>(config.height);
-  m_uiData.m_viewPortWidth    = static_cast<f32>(config.width);
-  m_uiData.m_backgroundColor  = f32v4(1.0f, 1.0f, 1.0f, 1.0f);
-  m_uiData.m_wireFrameColor   = f32v4(0.0f, 0.0f, 0.0f, 1.0f);
-  m_uiData.m_ambientColor     = f32v4(0.0f, 0.0f, 0.0f, 1.0f);
-  m_uiData.m_diffuseColor     = f32v4(1.0f, 1.0f, 1.0f, 1.0f);
-  m_uiData.m_specularColor    = f32v3(1.0f, 1.0f, 1.0f);
-  m_uiData.m_exponent         = 1;
-  m_uiData.m_wireFrameEnabled = true;
+  // set ui data to defaults
+  m_uiData.m_viewPortHeight          = static_cast<f32>(config.height);
+  m_uiData.m_viewPortWidth           = static_cast<f32>(config.width);
+  m_uiData.m_backgroundColor         = f32v4(0.6f, 0.6f, 0.6f, 1.0f);
+  m_uiData.m_wireFrameColor          = f32v4(0.0f, 0.0f, 0.0f, 1.0f);
+  m_uiData.m_ambientColor            = f32v4(0.0f, 0.0f, 0.0f, 1.0f);
+  m_uiData.m_diffuseColor            = f32v4(0.6f, 0.7f, 0.0f, 1.0f);
+  m_uiData.m_specularColor           = f32v3(0.5f, 0.25f, 0.25f);
+  m_uiData.m_exponent                = 1;
+  m_uiData.m_wireFrameEnabled        = false;
+  m_uiData.m_backFaceCullingEnabled  = false;
+  m_uiData.m_twoSidedLightingEnabled = false;
 
   createRootSignature();
   createPipeline();
@@ -333,11 +335,11 @@ MeshViewer::~MeshViewer()
 
 void MeshViewer::onDraw()
 {
+  // do not draw if window is minimized
   if (m_uiData.m_viewPortHeight == 0 || m_uiData.m_viewPortWidth == 0)
   {
     return;
   }
-  // uploadVertexBufferToGPU();
   if (!ImGui::GetIO().WantCaptureMouse)
   {
     bool pressed  = ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
@@ -354,11 +356,6 @@ void MeshViewer::onDraw()
       m_examinerController.move(getNormalizedMouseCoordinates());
     }
   }
-
-  // TODO Implement me!
-  // Use this to get the transformation Matrix.
-  // Of course, skip the (void). That is just to prevent warning, sinces I am not using it here (but you will have to!)
-  //(void)m_examinerController.getTransformationMatrix();
 
   const auto commandList = getCommandList();
   const auto rtvHandle   = getRTVHandle();

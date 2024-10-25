@@ -34,7 +34,7 @@ private:
   struct Vertex
   {
     f32v3 position;
-    f32v3 normal; // Normal vector
+    f32v3 normal;
     // f32v2 texcoord; // Texture coordinates
   };
   struct ConstantBuffer
