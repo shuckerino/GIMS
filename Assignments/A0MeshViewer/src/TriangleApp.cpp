@@ -13,16 +13,21 @@ using namespace gims;
 
 namespace
 {
-f32m4 getNormalizationTransformation(f32v3 const* const positions, ui32 nPositions, f32 window_width, f32 window_height)
+f32m4 getNormalizationTransformation(f32v3 const* const positions, ui32 nPositions)
 {
   if (nPositions == 0)
     return f32m4(1);
+
+  f32v3 minPos = positions[0];
+  f32v3 maxPos = positions[0];
 
   // We need to translate the vertices to the center of the cuboid
   // Therefore we first need to calculate the center of mass of the vertices
   f32v3 centerOfMass(0.0f);
   for (ui32 i = 0; i < nPositions; i++)
   {
+    minPos = glm::min(minPos, positions[i]);
+    maxPos = glm::max(minPos, positions[i]);
     centerOfMass += positions[i];
   }
 
@@ -30,9 +35,11 @@ f32m4 getNormalizationTransformation(f32v3 const* const positions, ui32 nPositio
   centerOfMass /= static_cast<float>(nPositions);
   f32m4 translation = glm::translate(glm::mat4(1.0f), -centerOfMass);
 
-  // scale with aspect ratio
-  f32   aspectRatio  = window_width / window_height;
-  f32m4 scale_matrix = glm::scale(glm::mat4(1.0f), f32v3(1.0f, aspectRatio, 1.0f));
+  // find largest dimension and scale accordingly
+  const f32v3 distance      = maxPos - minPos;
+  const f32        largestDimension = glm::max(distance.x, glm::max(distance.y, distance.z));
+  const f32 scalingFactor    = (largestDimension != 0) ? (1.0f / largestDimension) : 1.0f;
+  f32m4 scale_matrix = glm::scale(glm::mat4(1.0f), f32v3(scalingFactor));
 
   // Combine translation and scaling
   f32m4 normalizationMatrix = scale_matrix * translation;
@@ -49,7 +56,7 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
   m_uiData.m_viewPortHeight   = static_cast<f32>(config.height);
   m_uiData.m_viewPortWidth    = static_cast<f32>(config.width);
   m_uiData.m_backgroundColor  = f32v4(1.f, 1.f, 1.f, 1.0f);
-  m_uiData.m_wireFrameColor   = f32v4(0.5f, 1.f, 0.0f, 1.0f);
+  m_uiData.m_wireFrameColor   = f32v4(0.0f, 0.f, 0.0f, 1.0f);
   m_uiData.m_wireFrameEnabled = true;
 
   createRootSignature();
@@ -60,7 +67,6 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
 
   // Load the model data from file
   CograBinaryMeshFile cbm("../../../data/bunny.cbm");
-  cbm.load("../../../data/bunny.cbm");
 
   // Test print some stats
   cbm.printAttributes(std::cout);
@@ -110,22 +116,23 @@ void MeshViewer::createConstantBufferForEachSwapchainFrame()
 void MeshViewer::updateConstantBuffer()
 {
   ConstantBuffer cb;
-  std::cout << "Wireframe color is" << to_string(m_uiData.m_wireFrameColor) << std::endl;
-  // cb.wireFrameColor = f32v4(m_uiData.m_wireFrameColor, 1.0f);
+  // std::cout << "Wireframe color is" << to_string(m_uiData.m_wireFrameColor) << std::endl;
+  //  cb.wireFrameColor = f32v4(m_uiData.m_wireFrameColor, 1.0f);
   updateUIData(&cb);
 
   const auto pos_pointer = &m_VertexBufferCPU.data()->position;
-  f32m4      modelMatrix = getNormalizationTransformation(pos_pointer, static_cast<ui32>(m_VertexBufferCPU.size()),
-                                                          m_uiData.m_viewPortWidth, m_uiData.m_viewPortHeight);
+  f32m4      modelMatrix = getNormalizationTransformation(pos_pointer, static_cast<ui32>(m_VertexBufferCPU.size()));
 
   f32m4 viewMatrix = m_examinerController.getTransformationMatrix();
 
   f32m4 projMatrix =
       glm::perspectiveFovLH_ZO(glm::radians(30.0f), m_uiData.m_viewPortWidth, m_uiData.m_viewPortHeight, 0.0f, 100.0f);
-  const auto mvp = modelMatrix * viewMatrix * projMatrix;
+  const auto mv  = viewMatrix * modelMatrix;
+  const auto mvp = projMatrix * mv;
 
   // MVP matrix
-  cb.mvp = projMatrix * viewMatrix;
+  cb.mv  = mv;
+  cb.mvp = mvp;
 
   const auto& currentConstantBuffer = m_constantBuffers[this->getFrameIndex()];
   void*       p;
@@ -155,8 +162,8 @@ void MeshViewer::createPipeline()
       {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};*/
 
   D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
-      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
-  ;
+      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+      {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
   D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
   psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
@@ -171,9 +178,9 @@ void MeshViewer::createPipeline()
   psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
   psoDesc.NumRenderTargets                   = 1;
   psoDesc.SampleDesc.Count                   = 1;
-  psoDesc.RTVFormats[0]                      = getRenderTarget()->GetDesc().Format;
-  psoDesc.DSVFormat                          = getDepthStencil()->GetDesc().Format;
-  psoDesc.DepthStencilState.DepthEnable      = FALSE;
+  psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
+  psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
+  psoDesc.DepthStencilState.DepthEnable      = TRUE;
   psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
   psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ALL;
   psoDesc.DepthStencilState.StencilEnable    = FALSE;
@@ -190,7 +197,8 @@ void MeshViewer::createWireFramePipeline()
       compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"PS_WireFrame_main", L"ps_6_0");
 
   D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
-      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+      {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
   ;
 
   D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
@@ -221,6 +229,8 @@ void MeshViewer::initializeVertexBuffer(const CograBinaryMeshFile* cbm)
 {
   const auto numVertices   = cbm->getNumVertices();
   const auto vertexPointer = cbm->getPositionsPtr();
+  const auto normalPointer = reinterpret_cast<f32v3*>(cbm->getAttributePtr(0));
+  // const auto texture_coordinates = cbm->getAttributePtr(1);
 
   if (numVertices % 3 != 0)
   {
@@ -228,33 +238,12 @@ void MeshViewer::initializeVertexBuffer(const CograBinaryMeshFile* cbm)
     exit(1);
   }
   // convert simple float vector to vertex vector
-  for (size_t i = 0; i < numVertices * 3; i += 3)
+  for (size_t i = 0; i < numVertices; i++)
   {
     Vertex v;
-    v.position = {vertexPointer[i], vertexPointer[i + 1], vertexPointer[i + 2]};
+    v.position = {vertexPointer[i * 3], vertexPointer[i * 3 + 1], vertexPointer[i * 3 + 2]};
+    v.normal   = normalPointer[i];
     m_VertexBufferCPU.push_back(v);
-    // m_VertexBufferCPU.push_back({{vertexPointer[i], vertexPointer[i + 1], vertexPointer[i + 2]}});
-  }
-
-  for (size_t i = 0; i < m_VertexBufferCPU.size(); i += 3)
-  {
-    // get vertex position for triangle face
-    const auto p0 = m_VertexBufferCPU[i].position;
-    const auto p1 = m_VertexBufferCPU[i + 1].position;
-    const auto p2 = m_VertexBufferCPU[i + 2].position;
-
-    // compute two edges
-    const auto firstEdge = p0 - p1;
-    const auto secondEdge = p0 - p2;
-
-    // compute normal by using cross product
-    const auto triangeleFaceNormal = glm::normalize(glm::cross(firstEdge, secondEdge));
-
-    m_VertexBufferCPU[i].normal = triangeleFaceNormal;
-    m_VertexBufferCPU[i + 1].normal = triangeleFaceNormal;
-    m_VertexBufferCPU[i + 2].normal = triangeleFaceNormal;
-
-
   }
 
   m_vertexBufferSize = m_VertexBufferCPU.size() * sizeof(Vertex);
