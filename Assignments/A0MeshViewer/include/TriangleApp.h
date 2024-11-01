@@ -23,7 +23,7 @@ private:
     f32v3 m_ambientColor;
     f32v3 m_diffuseColor;
     f32v3 m_specularColor;
-    i32  m_exponent;
+    i32   m_exponent;
     f32   m_viewPortWidth;
     f32   m_viewPortHeight;
     bool  m_wireFrameEnabled;
@@ -35,7 +35,7 @@ private:
   {
     f32v3 position;
     f32v3 normal;
-    // f32v2 texcoord; // Texture coordinates
+    f32v2 texcoord; // Texture coordinates
   };
   struct ConstantBuffer
   {
@@ -67,12 +67,16 @@ private:
   size_t                  m_indexBufferSize;
   D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
 
+  ComPtr<ID3D12Resource>       m_texture;
+  ComPtr<ID3D12DescriptorHeap> m_srv;
+
   UiData m_uiData;
 
   void createRootSignature();
   void createConstantBufferForEachSwapchainFrame();
   void createPipeline();
   void createWireFramePipeline();
+  void createTexture();
 
   void initializeVertexBuffer(const CograBinaryMeshFile* cbm);
   void initializeIndexBuffer(const CograBinaryMeshFile* cbm);

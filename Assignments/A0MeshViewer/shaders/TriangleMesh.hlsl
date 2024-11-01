@@ -3,17 +3,17 @@ struct VertexShaderOutput
     float4 position : SV_POSITION;
     float3 viewSpacePosition : POSITION;
     float3 viewSpaceNormal : NORMAL;
-  //float2 texCoord : TEXCOORD;
+    float2 texCoord : TEXCOORD;
 };
 struct VertexShaderOutput_Wireframe
 {
-  float4 position : SV_POSITION;
+    float4 position : SV_POSITION;
 };
 
 
 cbuffer PerFrameConstants : register(b0)
 {
-  float4x4 mvp;
+    float4x4 mvp;
     float4x4 mv;
     float4 specularColor_and_Exponent;
     float4 ambientColor;
@@ -22,8 +22,8 @@ cbuffer PerFrameConstants : register(b0)
     //uint1 flags;
 }
 
-//Texture2D<float3> g_texture : register(t0);
-//SamplerState      g_sampler : register(s0);
+Texture2D<float3> g_texture : register(t0);
+SamplerState g_sampler : register(s0);
 
 //VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, float2 texCoord : TEXCOORD)
 //{
@@ -35,21 +35,23 @@ cbuffer PerFrameConstants : register(b0)
 //  output.texCoord          = texCoord;
 //  return output;
 //}
-VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL/*, float2 texCoord : TEXCOORD*/)
+VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, float2 texCoord : TEXCOORD)
 {
     VertexShaderOutput output;
     output.position = mul(mvp, float4(position, 1.0f));
     output.viewSpacePosition = mul(mv, float4(position, 1.0f)).xyz;
     output.viewSpaceNormal = mul(mv, float4(normal, 0.0f)).xyz;
+    output.texCoord = texCoord;
     return output;
 }
 
 float4 PS_main(VertexShaderOutput input)
     : SV_TARGET
-{  
+{
     //return float4(1.0f, 0.5f, 1.0f, 1.0f);
     //bool twoSidedLighting = flags & 0x1;
     //bool useTexture = flags & 0x2;
+    bool useTexture = true;
 
     float3 lightDirection = float3(0.0f, 0.0f, -1.0f);
 
@@ -65,8 +67,7 @@ float4 PS_main(VertexShaderOutput input)
     float f_diffuse = max(0.0f, dot(n, l));
     float f_specular = pow(max(0.0f, dot(n, h)), specularColor_and_Exponent.w);
 
-    //float3 textureColor = useTexture ? g_texture.Sample(g_sampler, input.texCoord, 0) : float4(1, 1, 1, 0);
-    float3 textureColor = float4(1, 1, 1, 0);
+    float3 textureColor = useTexture ? g_texture.Sample(g_sampler, input.texCoord, 0) : float4(1, 1, 1, 0);
 
     return float4(ambientColor.xyz + f_diffuse * diffuseColor.xyz * textureColor.xyz +
                       f_specular * specularColor_and_Exponent.xyz,
@@ -74,11 +75,11 @@ float4 PS_main(VertexShaderOutput input)
 
 }
 
-VertexShaderOutput_Wireframe VS_WireFrame_main(float3 position : POSITION, float3 normal : NORMAL/*, float2 texCoord : TEXCOORD*/)
+VertexShaderOutput_Wireframe VS_WireFrame_main(float3 position : POSITION, float3 normal : NORMAL, float2 texCoord : TEXCOORD)
 {
     VertexShaderOutput_Wireframe output;
 
-    output.position          = mul(mvp, float4(position, 1.0f));
+    output.position = mul(mvp, float4(position, 1.0f));
     return output;
 }
 
