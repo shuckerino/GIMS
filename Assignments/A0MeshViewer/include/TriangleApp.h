@@ -45,7 +45,7 @@ private:
     f32v4 ambientColor;
     f32v4 diffuseColor;
     f32v4 wireFrameColor;
-    // ui32  flags;
+    ui32  flags;
   };
 
   gims::ExaminerController m_examinerController;
@@ -57,8 +57,9 @@ private:
 
   ComPtr<ID3D12RootSignature> m_rootSignature;
 
-  ComPtr<ID3D12PipelineState> m_pipelineState;
-  ComPtr<ID3D12PipelineState> m_wireFramePipelineState;
+  // all pipeline states
+  ComPtr<ID3D12PipelineState> m_pipelineStateWithNoCulling, m_wireFramePipelineStateWithNoCulling,
+      m_pipelineStateWithBackFaceCulling, m_wireFramePipelineStateWithBackFaceCulling;
 
   std::vector<ComPtr<ID3D12Resource>> m_constantBuffers;
 
@@ -74,9 +75,12 @@ private:
 
   void createRootSignature();
   void createConstantBufferForEachSwapchainFrame();
-  void createPipeline();
-  void createWireFramePipeline();
   void createTexture();
+
+  void createPipelineWithBackFaceCulling();
+  void createPipelineWithNoCulling();
+  void createWireFramePipelineWithBackFaceCulling();
+  void createWireFramePipelineWithNoCulling();
 
   void initializeVertexBuffer(const CograBinaryMeshFile* cbm);
   void initializeIndexBuffer(const CograBinaryMeshFile* cbm);
