@@ -30,6 +30,7 @@ private:
     bool  m_backFaceCullingEnabled;
     bool  m_twoSidedLightingEnabled;
     bool  m_useTextureEnabled;
+    bool  m_useFlatShading;
   };
   struct Vertex
   {

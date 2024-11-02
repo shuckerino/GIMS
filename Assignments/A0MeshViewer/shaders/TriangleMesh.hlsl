@@ -38,12 +38,16 @@ float4 PS_main(VertexShaderOutput input)
     : SV_TARGET
 {
     bool twoSidedLighting = flags & 0x1;
-    bool useTexture = flags & 0x2;
+    bool useTexture = (flags >> 1) & 0x1;
+    bool useFlatShading = (flags >> 2) & 0x1;
 
     float3 lightDirection = float3(0.0f, 0.0f, -1.0f);
 
     float3 l = normalize(lightDirection);
-    float3 n = normalize(input.viewSpaceNormal);
+
+    // Calculate normal (depending on shading model)
+    float3 n = useFlatShading ? normalize(cross(ddx(input.viewSpacePosition), ddy(input.viewSpacePosition))) : normalize(input.viewSpaceNormal);
+
     if (twoSidedLighting)
     {
         n = n.z < 0.0 ? n : -n;

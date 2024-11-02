@@ -67,6 +67,7 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
   m_uiData.m_backFaceCullingEnabled  = false;
   m_uiData.m_twoSidedLightingEnabled = false;
   m_uiData.m_useTextureEnabled       = false;
+  m_uiData.m_useFlatShading          = false;
 
   createRootSignature();
 
@@ -140,7 +141,7 @@ void MeshViewer::createRootSignature()
 
 void MeshViewer::createConstantBufferForEachSwapchainFrame()
 {
-  // here we need to create n constant buffers with n being the number of swapchain frames
+  // here we need to create n constant buffers with n being the number of swap chain frames
   const auto numSwapchainFrames = getDX12AppConfig().frameCount;
   m_constantBuffers.resize(numSwapchainFrames);
 
@@ -471,7 +472,8 @@ void MeshViewer::updateUIData(ConstantBuffer* cb)
   cb->specularColor_and_Exponent.y = m_uiData.m_specularColor.y;
   cb->specularColor_and_Exponent.z = m_uiData.m_specularColor.z;
   cb->specularColor_and_Exponent.w = static_cast<f32>(m_uiData.m_exponent);
-  cb->flags = (m_uiData.m_twoSidedLightingEnabled ? 1 : 0) | (m_uiData.m_useTextureEnabled ? 1 : 0) << 1;
+  cb->flags = (m_uiData.m_twoSidedLightingEnabled ? 1 : 0) | (m_uiData.m_useTextureEnabled ? 1 : 0) << 1 |
+              (m_uiData.m_useFlatShading ? 1 : 0) << 2;
 }
 
 #pragma endregion
@@ -553,16 +555,17 @@ void MeshViewer::onDrawUI()
 
   // Information window
   ImGui::Begin("Information", nullptr, imGuiFlags);
-  ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
+  ImGui::Text("Frame time: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
   ImGui::End();
 
   // Configuration window
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor.x);
   ImGui::Checkbox("Back-Face Culling", &m_uiData.m_backFaceCullingEnabled);
-  ImGui::Checkbox("Overlay Wireframe", &m_uiData.m_wireFrameEnabled);
-  ImGui::ColorEdit3("Wireframe Color", &m_uiData.m_wireFrameColor.x);
+  ImGui::Checkbox("Overlay Wire Frame", &m_uiData.m_wireFrameEnabled);
+  ImGui::ColorEdit3("Wire Frame Color", &m_uiData.m_wireFrameColor.x);
   ImGui::Checkbox("Two-Sided Lighting", &m_uiData.m_twoSidedLightingEnabled);
+  ImGui::Checkbox("Flat Shading", &m_uiData.m_useFlatShading);
   ImGui::Checkbox("Use Texture", &m_uiData.m_useTextureEnabled);
   ImGui::ColorEdit3("Ambient", &m_uiData.m_ambientColor.x);
   ImGui::ColorEdit3("Diffuse", &m_uiData.m_diffuseColor.x);
