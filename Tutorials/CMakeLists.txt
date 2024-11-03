@@ -56,3 +56,6 @@ set_target_properties (T16ComputeShaderPostProcess PROPERTIES FOLDER Tutorials)
 add_subdirectory(./LS01Communication)
 set_target_properties (LS01Communication PROPERTIES FOLDER Tutorials)
 
+add_subdirectory(./LS02VertexBuffer)
+set_target_properties (LS02VertexBuffer PROPERTIES FOLDER Tutorials)
+

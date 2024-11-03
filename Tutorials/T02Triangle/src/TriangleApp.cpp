@@ -6,7 +6,7 @@
 using namespace gims;
 
 
-class Communication : public DX12App
+class VertexBuffer : public DX12App
 {
 private:
   ComPtr<ID3D12PipelineState> m_pipelineState;
@@ -51,7 +51,7 @@ private:
   }
 
 public:
-  Communication(const DX12AppConfig createInfo)
+  VertexBuffer(const DX12AppConfig createInfo)
       : DX12App(createInfo)
   {
     createRootSignature();
@@ -86,7 +86,7 @@ int main(int /* argc*/, char /* **argv */)
   config.useVSync = true;
   try
   {
-    Communication app(config);
+    VertexBuffer app(config);
     app.run();
   }
   catch (const std::exception& e)
