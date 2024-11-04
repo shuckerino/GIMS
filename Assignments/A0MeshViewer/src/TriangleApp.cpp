@@ -41,8 +41,11 @@ f32m4 getNormalizationTransformation(f32v3 const* const positions, ui32 nPositio
   const f32   scalingFactor    = (largestDimension != 0) ? (1.0f / largestDimension) : 1.0f;
   f32m4       scale_matrix     = glm::scale(glm::mat4(1.0f), f32v3(scalingFactor));
 
+  // add 180 degree rotation around y-axis so bunny faces camera
+  const f32m4 rotationMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
   // Combine translation and scaling
-  f32m4 normalizationMatrix = scale_matrix * translation;
+  f32m4 normalizationMatrix = rotationMatrix * scale_matrix * translation;
 
   return normalizationMatrix;
 }
@@ -62,7 +65,7 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
   m_uiData.m_ambientColor            = f32v4(0.0f, 0.0f, 0.0f, 1.0f);
   m_uiData.m_diffuseColor            = f32v4(1.0f, 1.0f, 1.0f, 1.0f);
   m_uiData.m_specularColor           = f32v3(1.0f, 1.0f, 1.0f);
-  m_uiData.m_exponent                = 100;
+  m_uiData.m_exponent                = 128;
   m_uiData.m_wireFrameEnabled        = false;
   m_uiData.m_backFaceCullingEnabled  = false;
   m_uiData.m_twoSidedLightingEnabled = false;
@@ -514,7 +517,7 @@ void MeshViewer::onDraw()
 
   commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
   commandList->SetGraphicsRootSignature(
-      m_rootSignature.Get()); // root signature needs to be set before accesing it in "SetGraphicsRootDescriptorTable"
+      m_rootSignature.Get()); // root signature needs to be set before accessing it in "SetGraphicsRootDescriptorTable"
 
   // texture
   commandList->SetDescriptorHeaps(1, m_srv.GetAddressOf());
@@ -553,14 +556,9 @@ void MeshViewer::onDrawUI()
   m_uiData.m_viewPortHeight = ImGui::GetMainViewport()->WorkSize.y;
   m_uiData.m_viewPortWidth  = ImGui::GetMainViewport()->WorkSize.x;
 
-  // Information window
-  ImGui::Begin("Information", nullptr, imGuiFlags);
-  ImGui::Text("Frame time: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
-  ImGui::End();
-
   // Configuration window
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
-  ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor.x);
+  ImGui::Text("Frame time: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
   ImGui::Checkbox("Back-Face Culling", &m_uiData.m_backFaceCullingEnabled);
   ImGui::Checkbox("Overlay Wire Frame", &m_uiData.m_wireFrameEnabled);
   ImGui::ColorEdit3("Wire Frame Color", &m_uiData.m_wireFrameColor.x);

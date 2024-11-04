@@ -8,6 +8,7 @@ using namespace gims;
 int main(int /* argc*/, char /* **argv */)
 {
   gims::DX12AppConfig config;
+  config.title    = L"Super cool bunny renderer!";
   config.useVSync = false;
   config.debug    = true;
   try
