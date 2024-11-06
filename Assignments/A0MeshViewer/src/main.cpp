@@ -9,7 +9,7 @@ int main(int /* argc*/, char /* **argv */)
 {
   gims::DX12AppConfig config;
   config.title    = L"Super cool bunny renderer!";
-  config.useVSync = false;
+  config.useVSync = true;
   config.debug    = true;
   try
   {
