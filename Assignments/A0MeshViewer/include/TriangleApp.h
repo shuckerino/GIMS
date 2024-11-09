@@ -23,6 +23,7 @@ private:
     f32v3 m_ambientColor;
     f32v3 m_diffuseColor;
     f32v3 m_specularColor;
+    f32v3 m_pointCloudColor;
     i32   m_exponent;
     f32   m_viewPortWidth;
     f32   m_viewPortHeight;
@@ -31,6 +32,7 @@ private:
     bool  m_twoSidedLightingEnabled;
     bool  m_useTextureEnabled;
     bool  m_useFlatShading;
+    bool  m_usePointCloud;
   };
   struct Vertex
   {
@@ -38,6 +40,7 @@ private:
     f32v3 normal;
     f32v2 texcoord; // Texture coordinates
   };
+
   struct ConstantBuffer
   {
     f32m4 mvp;
@@ -46,6 +49,7 @@ private:
     f32v4 ambientColor;
     f32v4 diffuseColor;
     f32v4 wireFrameColor;
+    f32v4 pointCloudColor;
     ui32  flags;
   };
 
@@ -60,7 +64,7 @@ private:
 
   // all pipeline states
   ComPtr<ID3D12PipelineState> m_pipelineStateWithNoCulling, m_wireFramePipelineStateWithNoCulling,
-      m_pipelineStateWithBackFaceCulling, m_wireFramePipelineStateWithBackFaceCulling;
+      m_pipelineStateWithBackFaceCulling, m_wireFramePipelineStateWithBackFaceCulling, m_pointCloudPipelineState;
 
   std::vector<ComPtr<ID3D12Resource>> m_constantBuffers;
 
@@ -82,6 +86,7 @@ private:
   void createPipelineWithNoCulling();
   void createWireFramePipelineWithBackFaceCulling();
   void createWireFramePipelineWithNoCulling();
+  void createPointCloudPipeline();
 
   void initializeVertexBuffer(const CograBinaryMeshFile* cbm);
   void initializeIndexBuffer(const CograBinaryMeshFile* cbm);

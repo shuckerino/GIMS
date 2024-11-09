@@ -18,6 +18,7 @@ cbuffer PerFrameConstants : register(b0)
     float4 ambientColor;
     float4 diffuseColor;
     float4 wireFrameColor;
+    float4 pointCloudColor;
     uint1 flags;
 }
 
@@ -78,4 +79,28 @@ float4 PS_WireFrame_main(VertexShaderOutput_Wireframe input)
     : SV_TARGET
 {
     return wireFrameColor;
+}
+
+
+// point clouds
+struct PointCloudInput
+{
+    float3 position : POSITION;
+};
+
+struct PointCloudOutput
+{
+    float4 position : SV_POSITION;
+    float3 color : COLOR;
+};
+
+PointCloudOutput VS_PointCloud(PointCloudInput input) {
+    PointCloudOutput output;
+    output.position = mul(mvp, float4(input.position, 1.0f));
+    output.color = pointCloudColor;
+    return output;
+}
+
+float4 PS_PointCloud(PointCloudOutput input) : SV_TARGET {
+    return float4(input.color, 1.0f);
 }

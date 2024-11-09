@@ -65,12 +65,14 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
   m_uiData.m_ambientColor            = f32v4(0.0f, 0.0f, 0.0f, 1.0f);
   m_uiData.m_diffuseColor            = f32v4(1.0f, 1.0f, 1.0f, 1.0f);
   m_uiData.m_specularColor           = f32v3(1.0f, 1.0f, 1.0f);
+  m_uiData.m_pointCloudColor         = f32v3(1.0f, 1.0f, 1.0f);
   m_uiData.m_exponent                = 128;
   m_uiData.m_wireFrameEnabled        = false;
   m_uiData.m_backFaceCullingEnabled  = false;
   m_uiData.m_twoSidedLightingEnabled = false;
   m_uiData.m_useTextureEnabled       = false;
   m_uiData.m_useFlatShading          = false;
+  m_uiData.m_usePointCloud           = false;
 
   createRootSignature();
 
@@ -78,6 +80,7 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
   createPipelineWithNoCulling();
   createWireFramePipelineWithBackFaceCulling();
   createWireFramePipelineWithNoCulling();
+  createPointCloudPipeline();
 
   createConstantBufferForEachSwapchainFrame();
   m_examinerController.setTranslationVector(f32v3(0, 0, 3));
@@ -158,6 +161,53 @@ void MeshViewer::createConstantBufferForEachSwapchainFrame()
                                          IID_PPV_ARGS(&m_constantBuffers[i]));
   }
 }
+
+void MeshViewer::createTexture()
+{
+  i32 textureWidth, textureHeight, textureComp;
+
+  stbi_set_flip_vertically_on_load(1);
+  std::unique_ptr<ui8, void (*)(void*)> image(
+      stbi_load("../../../data/bunny.png", &textureWidth, &textureHeight, &textureComp, 4), &stbi_image_free);
+
+  D3D12_RESOURCE_DESC textureDescription = {};
+  textureDescription.MipLevels           = 1;
+  textureDescription.Format              = DXGI_FORMAT_R8G8B8A8_UNORM;
+  textureDescription.Width               = textureWidth;
+  textureDescription.Height              = textureHeight;
+  textureDescription.Flags               = D3D12_RESOURCE_FLAG_NONE;
+  textureDescription.DepthOrArraySize    = 1;
+  textureDescription.SampleDesc.Count    = 1;
+  textureDescription.SampleDesc.Quality  = 0;
+  textureDescription.Dimension           = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+
+  const auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+  throwIfFailed(getDevice()->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &textureDescription,
+                                                     D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_texture)));
+
+  // upload texture to GPU memory
+  UploadHelper uploadHelper(getDevice(), GetRequiredIntermediateSize(m_texture.Get(), 0, 1));
+  uploadHelper.uploadTexture(image.get(), m_texture, textureWidth, textureHeight, getCommandQueue());
+
+  D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+  desc.Type                       = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+  desc.NumDescriptors             = 1;
+  desc.NodeMask                   = 0;
+  desc.Flags                      = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+  throwIfFailed(getDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_srv)));
+
+  D3D12_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc = {};
+  shaderResourceViewDesc.ViewDimension                   = D3D12_SRV_DIMENSION_TEXTURE2D;
+  shaderResourceViewDesc.Shader4ComponentMapping         = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+  shaderResourceViewDesc.Format                          = DXGI_FORMAT_R8G8B8A8_UNORM;
+  shaderResourceViewDesc.Texture2D.MipLevels             = 1;
+  shaderResourceViewDesc.Texture2D.MostDetailedMip       = 0;
+  shaderResourceViewDesc.Texture2D.ResourceMinLODClamp   = 0.0f;
+  getDevice()->CreateShaderResourceView(m_texture.Get(), &shaderResourceViewDesc,
+                                        m_srv->GetCPUDescriptorHandleForHeapStart());
+}
+
+#pragma region Pipelines
 
 void MeshViewer::createPipelineWithBackFaceCulling()
 {
@@ -307,50 +357,40 @@ void MeshViewer::createWireFramePipelineWithNoCulling()
       getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_wireFramePipelineStateWithNoCulling)));
 }
 
-void MeshViewer::createTexture()
+void MeshViewer::createPointCloudPipeline()
 {
-  i32 textureWidth, textureHeight, textureComp;
+  const auto vertexShader =
+      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_PointCloud", L"vs_6_0");
 
-  stbi_set_flip_vertically_on_load(1);
-  std::unique_ptr<ui8, void (*)(void*)> image(
-      stbi_load("../../../data/bunny.png", &textureWidth, &textureHeight, &textureComp, 4), &stbi_image_free);
+  const auto pixelShader =
+      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"PS_PointCloud", L"ps_6_0");
 
-  D3D12_RESOURCE_DESC textureDescription = {};
-  textureDescription.MipLevels           = 1;
-  textureDescription.Format              = DXGI_FORMAT_R8G8B8A8_UNORM;
-  textureDescription.Width               = textureWidth;
-  textureDescription.Height              = textureHeight;
-  textureDescription.Flags               = D3D12_RESOURCE_FLAG_NONE;
-  textureDescription.DepthOrArraySize    = 1;
-  textureDescription.SampleDesc.Count    = 1;
-  textureDescription.SampleDesc.Quality  = 0;
-  textureDescription.Dimension           = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+  D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
+      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
-  const auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-  throwIfFailed(getDevice()->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &textureDescription,
-                                                     D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_texture)));
+  D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+  psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
+  psoDesc.pRootSignature                     = m_rootSignature.Get();
+  psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
+  psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
+  psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+  psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_BACK;
+  psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+  psoDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+  psoDesc.SampleMask                         = UINT_MAX;
+  psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+  psoDesc.NumRenderTargets                   = 1;
+  psoDesc.SampleDesc.Count                   = 1;
+  psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
+  psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
+  psoDesc.DepthStencilState.DepthEnable      = TRUE;
+  psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_LESS;
+  psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ALL;
+  psoDesc.DepthStencilState.StencilEnable    = FALSE;
 
-  // upload texture to GPU memory
-  UploadHelper uploadHelper(getDevice(), GetRequiredIntermediateSize(m_texture.Get(), 0, 1));
-  uploadHelper.uploadTexture(image.get(), m_texture, textureWidth, textureHeight, getCommandQueue());
-
-  D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-  desc.Type                       = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-  desc.NumDescriptors             = 1;
-  desc.NodeMask                   = 0;
-  desc.Flags                      = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-  throwIfFailed(getDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_srv)));
-
-  D3D12_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc = {};
-  shaderResourceViewDesc.ViewDimension                   = D3D12_SRV_DIMENSION_TEXTURE2D;
-  shaderResourceViewDesc.Shader4ComponentMapping         = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-  shaderResourceViewDesc.Format                          = DXGI_FORMAT_R8G8B8A8_UNORM;
-  shaderResourceViewDesc.Texture2D.MipLevels             = 1;
-  shaderResourceViewDesc.Texture2D.MostDetailedMip       = 0;
-  shaderResourceViewDesc.Texture2D.ResourceMinLODClamp   = 0.0f;
-  getDevice()->CreateShaderResourceView(m_texture.Get(), &shaderResourceViewDesc,
-                                        m_srv->GetCPUDescriptorHandleForHeapStart());
+  throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pointCloudPipelineState)));
 }
+#pragma endregion
 
 #pragma endregion
 
@@ -475,6 +515,7 @@ void MeshViewer::updateUIData(ConstantBuffer* cb)
   cb->specularColor_and_Exponent.y = m_uiData.m_specularColor.y;
   cb->specularColor_and_Exponent.z = m_uiData.m_specularColor.z;
   cb->specularColor_and_Exponent.w = static_cast<f32>(m_uiData.m_exponent);
+  cb->pointCloudColor              = f32v4(m_uiData.m_pointCloudColor, 1.0f);
   cb->flags = (m_uiData.m_twoSidedLightingEnabled ? 1 : 0) | (m_uiData.m_useTextureEnabled ? 1 : 0) << 1 |
               (m_uiData.m_useFlatShading ? 1 : 0) << 2;
 }
@@ -531,9 +572,18 @@ void MeshViewer::onDraw()
   commandList->RSSetViewports(1, &getViewport());
   commandList->RSSetScissorRects(1, &getRectScissor());
 
-  commandList->SetPipelineState(m_uiData.m_backFaceCullingEnabled ? m_pipelineStateWithBackFaceCulling.Get()
-                                                                  : m_pipelineStateWithNoCulling.Get());
-  commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  if (m_uiData.m_usePointCloud)
+  {
+    commandList->SetPipelineState(m_pointCloudPipelineState.Get());
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
+  }
+  else
+  {
+    commandList->SetPipelineState(m_uiData.m_backFaceCullingEnabled ? m_pipelineStateWithBackFaceCulling.Get()
+                                                                    : m_pipelineStateWithNoCulling.Get());
+
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  }
   commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
   commandList->IASetIndexBuffer(&m_indexBufferView);
   commandList->SetGraphicsRootConstantBufferView(1, m_constantBuffers[getFrameIndex()]->GetGPUVirtualAddress());
@@ -545,6 +595,8 @@ void MeshViewer::onDraw()
   {
     commandList->SetPipelineState(m_uiData.m_backFaceCullingEnabled ? m_wireFramePipelineStateWithBackFaceCulling.Get()
                                                                     : m_wireFramePipelineStateWithNoCulling.Get());
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
     commandList->DrawIndexedInstanced(static_cast<ui32>(m_indexBuffer.size()), 1, 0, 0, 0);
   }
 }
@@ -565,6 +617,8 @@ void MeshViewer::onDrawUI()
   ImGui::Checkbox("Two-Sided Lighting", &m_uiData.m_twoSidedLightingEnabled);
   ImGui::Checkbox("Flat Shading", &m_uiData.m_useFlatShading);
   ImGui::Checkbox("Use Texture", &m_uiData.m_useTextureEnabled);
+  ImGui::Checkbox("Use Point Cloud", &m_uiData.m_usePointCloud);
+  ImGui::ColorEdit3("Point Cloud Color", &m_uiData.m_pointCloudColor.x);
   ImGui::ColorEdit3("Ambient", &m_uiData.m_ambientColor.x);
   ImGui::ColorEdit3("Diffuse", &m_uiData.m_diffuseColor.x);
   ImGui::ColorEdit3("Specular", &m_uiData.m_specularColor.x);
