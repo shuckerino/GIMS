@@ -81,12 +81,7 @@ private:
   void createRootSignature();
   void createConstantBufferForEachSwapchainFrame();
   void createTexture();
-
-  void createPipelineWithBackFaceCulling();
-  void createPipelineWithNoCulling();
-  void createWireFramePipelineWithBackFaceCulling();
-  void createWireFramePipelineWithNoCulling();
-  void createPointCloudPipeline();
+  void createPipeline(bool enableBackFaceCulling, bool enableWireFrameMode, bool enablePointCloudMode);
 
   void initializeVertexBuffer(const CograBinaryMeshFile* cbm);
   void initializeIndexBuffer(const CograBinaryMeshFile* cbm);

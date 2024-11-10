@@ -1,3 +1,10 @@
+struct VertexShaderInput
+{
+    float3 position : POSITION;
+    float3 normal : NORMAL;
+    float2 texCoord : TEXCOORD;
+};
+
 struct VertexShaderOutput
 {
     float4 position : SV_POSITION;
@@ -8,6 +15,17 @@ struct VertexShaderOutput
 struct VertexShaderOutput_Wireframe
 {
     float4 position : SV_POSITION;
+};
+
+struct VertexShaderInput_PointCloud
+{
+    float3 position : POSITION;
+};
+
+struct VertexShaderOutput_PointCloud
+{
+    float4 position : SV_POSITION;
+    float3 color : COLOR;
 };
 
 cbuffer PerFrameConstants : register(b0)
@@ -25,18 +43,17 @@ cbuffer PerFrameConstants : register(b0)
 Texture2D<float3> g_texture : register(t0);
 SamplerState g_sampler : register(s0);
 
-VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, float2 texCoord : TEXCOORD)
+VertexShaderOutput VS_main(VertexShaderInput input)
 {
     VertexShaderOutput output;
-    output.position = mul(mvp, float4(position, 1.0f));
-    output.viewSpacePosition = mul(mv, float4(position, 1.0f)).xyz;
-    output.viewSpaceNormal = mul(mv, float4(normal, 0.0f)).xyz;
-    output.texCoord = texCoord;
+    output.position = mul(mvp, float4(input.position, 1.0f));
+    output.viewSpacePosition = mul(mv, float4(input.position, 1.0f)).xyz;
+    output.viewSpaceNormal = mul(mv, float4(input.normal, 0.0f)).xyz;
+    output.texCoord = input.texCoord;
     return output;
 }
 
-float4 PS_main(VertexShaderOutput input)
-    : SV_TARGET
+float4 PS_main(VertexShaderOutput input) : SV_TARGET
 {
     bool twoSidedLighting = flags & 0x1;
     bool useTexture = (flags >> 1) & 0x1;
@@ -67,7 +84,7 @@ float4 PS_main(VertexShaderOutput input)
 
 }
 
-VertexShaderOutput_Wireframe VS_WireFrame_main(float3 position : POSITION, float3 normal : NORMAL, float2 texCoord : TEXCOORD)
+VertexShaderOutput_Wireframe VS_WireFrame_main(float3 position : POSITION)
 {
     VertexShaderOutput_Wireframe output;
 
@@ -81,26 +98,13 @@ float4 PS_WireFrame_main(VertexShaderOutput_Wireframe input)
     return wireFrameColor;
 }
 
-
-// point clouds
-struct PointCloudInput
-{
-    float3 position : POSITION;
-};
-
-struct PointCloudOutput
-{
-    float4 position : SV_POSITION;
-    float3 color : COLOR;
-};
-
-PointCloudOutput VS_PointCloud(PointCloudInput input) {
-    PointCloudOutput output;
+VertexShaderOutput_PointCloud VS_PointCloud(VertexShaderInput_PointCloud input) {
+    VertexShaderOutput_PointCloud output;
     output.position = mul(mvp, float4(input.position, 1.0f));
     output.color = pointCloudColor;
     return output;
 }
 
-float4 PS_PointCloud(PointCloudOutput input) : SV_TARGET {
+float4 PS_PointCloud(VertexShaderOutput_PointCloud input) : SV_TARGET {
     return float4(input.color, 1.0f);
 }

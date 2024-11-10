@@ -76,11 +76,11 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
 
   createRootSignature();
 
-  createPipelineWithBackFaceCulling();
-  createPipelineWithNoCulling();
-  createWireFramePipelineWithBackFaceCulling();
-  createWireFramePipelineWithNoCulling();
-  createPointCloudPipeline();
+  createPipeline(false, false, false); // normal without back face culling
+  createPipeline(true, false, false); // normal with back face culling
+  createPipeline(false, true, false); // wire frame without back face culling
+  createPipeline(true, true, false); // wire frame with back face culling
+  createPipeline(false, false, true); // point cloud
 
   createConstantBufferForEachSwapchainFrame();
   m_examinerController.setTranslationVector(f32v3(0, 0, 3));
@@ -209,186 +209,128 @@ void MeshViewer::createTexture()
 
 #pragma region Pipelines
 
-void MeshViewer::createPipelineWithBackFaceCulling()
+void MeshViewer::createPipeline(bool enableBackFaceCulling, bool enableWireFrameMode, bool enablePointCloudMode)
 {
-  const auto vertexShader =
-      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_main", L"vs_6_0");
+  ComPtr<IDxcBlob> vertexShader;
+  ComPtr<IDxcBlob> pixelShader;
 
-  const auto pixelShader =
-      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"PS_main", L"ps_6_0");
+  if (enableWireFrameMode)
+  {
+    vertexShader =
+        compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_WireFrame_main", L"vs_6_0");
 
-  D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
-      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-      {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-      {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+    pixelShader =
+        compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"PS_WireFrame_main", L"ps_6_0");
 
-  D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-  psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
-  psoDesc.pRootSignature                     = m_rootSignature.Get();
-  psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
-  psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
-  psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-  psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_BACK;
-  psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-  psoDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-  psoDesc.SampleMask                         = UINT_MAX;
-  psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-  psoDesc.NumRenderTargets                   = 1;
-  psoDesc.SampleDesc.Count                   = 1;
-  psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
-  psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
-  psoDesc.DepthStencilState.DepthEnable      = TRUE;
-  psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_LESS;
-  psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ALL;
-  psoDesc.DepthStencilState.StencilEnable    = FALSE;
+    D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
-  throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineStateWithBackFaceCulling)));
-}
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
+    psoDesc.pRootSignature                     = m_rootSignature.Get();
+    psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
+    psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
+    psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.RasterizerState.CullMode           = enableBackFaceCulling ? D3D12_CULL_MODE_BACK : D3D12_CULL_MODE_NONE;
+    psoDesc.RasterizerState.FillMode           = D3D12_FILL_MODE_WIREFRAME;
+    psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    psoDesc.SampleMask                         = UINT_MAX;
+    psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.NumRenderTargets                   = 1;
+    psoDesc.SampleDesc.Count                   = 1;
+    psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
+    psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
+    psoDesc.DepthStencilState.DepthEnable      = TRUE;
+    psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
+    psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ZERO;
+    psoDesc.DepthStencilState.StencilEnable    = FALSE;
 
-void MeshViewer::createPipelineWithNoCulling()
-{
-  const auto vertexShader =
-      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_main", L"vs_6_0");
+    if (enableBackFaceCulling)
+    {
+      throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_wireFramePipelineStateWithBackFaceCulling)));
+    }
+    else
+    {
+      throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_wireFramePipelineStateWithNoCulling)));
+    }
+   
+  }
+  else if (enablePointCloudMode)
+  {
+    vertexShader =
+        compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_PointCloud", L"vs_6_0");
 
-  const auto pixelShader =
-      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"PS_main", L"ps_6_0");
+    pixelShader =
+        compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"PS_PointCloud", L"ps_6_0");
 
-  D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
-      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-      {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-      {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+     D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
-  D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-  psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
-  psoDesc.pRootSignature                     = m_rootSignature.Get();
-  psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
-  psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
-  psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-  psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_NONE;
-  psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-  psoDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-  psoDesc.SampleMask                         = UINT_MAX;
-  psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-  psoDesc.NumRenderTargets                   = 1;
-  psoDesc.SampleDesc.Count                   = 1;
-  psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
-  psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
-  psoDesc.DepthStencilState.DepthEnable      = TRUE;
-  psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_LESS;
-  psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ALL;
-  psoDesc.DepthStencilState.StencilEnable    = FALSE;
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
+    psoDesc.pRootSignature                     = m_rootSignature.Get();
+    psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
+    psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
+    psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_BACK;
+    psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    psoDesc.SampleMask                         = UINT_MAX;
+    psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+    psoDesc.NumRenderTargets                   = 1;
+    psoDesc.SampleDesc.Count                   = 1;
+    psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
+    psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
+    psoDesc.DepthStencilState.DepthEnable      = TRUE;
+    psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_LESS;
+    psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ALL;
+    psoDesc.DepthStencilState.StencilEnable    = FALSE;
 
-  throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineStateWithNoCulling)));
-}
+    throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pointCloudPipelineState)));
 
-void MeshViewer::createWireFramePipelineWithBackFaceCulling()
-{
-  const auto vertexShader =
-      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_WireFrame_main", L"vs_6_0");
+  }
+  else
+  {
+    vertexShader = compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_main", L"vs_6_0");
 
-  const auto pixelShader =
-      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"PS_WireFrame_main", L"ps_6_0");
+    pixelShader = compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"PS_main", L"ps_6_0");
 
-  D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
-      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-      {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-      {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+    D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
-  D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-  psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
-  psoDesc.pRootSignature                     = m_rootSignature.Get();
-  psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
-  psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
-  psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-  psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_BACK;
-  psoDesc.RasterizerState.FillMode           = D3D12_FILL_MODE_WIREFRAME;
-  psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-  psoDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-  psoDesc.SampleMask                         = UINT_MAX;
-  psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-  psoDesc.NumRenderTargets                   = 1;
-  psoDesc.SampleDesc.Count                   = 1;
-  psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
-  psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
-  psoDesc.DepthStencilState.DepthEnable      = TRUE;
-  psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
-  psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ZERO;
-  psoDesc.DepthStencilState.StencilEnable    = FALSE;
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
+    psoDesc.pRootSignature                     = m_rootSignature.Get();
+    psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
+    psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
+    psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.RasterizerState.CullMode           = enableBackFaceCulling ? D3D12_CULL_MODE_BACK : D3D12_CULL_MODE_NONE;
+    psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    psoDesc.SampleMask                         = UINT_MAX;
+    psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.NumRenderTargets                   = 1;
+    psoDesc.SampleDesc.Count                   = 1;
+    psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
+    psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
+    psoDesc.DepthStencilState.DepthEnable      = TRUE;
+    psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_LESS;
+    psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ALL;
+    psoDesc.DepthStencilState.StencilEnable    = FALSE;
 
-  throwIfFailed(
-      getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_wireFramePipelineStateWithBackFaceCulling)));
-}
-
-void MeshViewer::createWireFramePipelineWithNoCulling()
-{
-  const auto vertexShader =
-      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_WireFrame_main", L"vs_6_0");
-
-  const auto pixelShader =
-      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"PS_WireFrame_main", L"ps_6_0");
-
-  D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
-      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-      {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-      {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
-
-  D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-  psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
-  psoDesc.pRootSignature                     = m_rootSignature.Get();
-  psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
-  psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
-  psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-  psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_NONE;
-  psoDesc.RasterizerState.FillMode           = D3D12_FILL_MODE_WIREFRAME;
-  psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-  psoDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-  psoDesc.SampleMask                         = UINT_MAX;
-  psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-  psoDesc.NumRenderTargets                   = 1;
-  psoDesc.SampleDesc.Count                   = 1;
-  psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
-  psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
-  psoDesc.DepthStencilState.DepthEnable      = TRUE;
-  psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
-  psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ZERO;
-  psoDesc.DepthStencilState.StencilEnable    = FALSE;
-
-  throwIfFailed(
-      getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_wireFramePipelineStateWithNoCulling)));
-}
-
-void MeshViewer::createPointCloudPipeline()
-{
-  const auto vertexShader =
-      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_PointCloud", L"vs_6_0");
-
-  const auto pixelShader =
-      compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"PS_PointCloud", L"ps_6_0");
-
-  D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
-      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
-
-  D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-  psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
-  psoDesc.pRootSignature                     = m_rootSignature.Get();
-  psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
-  psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
-  psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-  psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_BACK;
-  psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-  psoDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-  psoDesc.SampleMask                         = UINT_MAX;
-  psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
-  psoDesc.NumRenderTargets                   = 1;
-  psoDesc.SampleDesc.Count                   = 1;
-  psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
-  psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
-  psoDesc.DepthStencilState.DepthEnable      = TRUE;
-  psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_LESS;
-  psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ALL;
-  psoDesc.DepthStencilState.StencilEnable    = FALSE;
-
-  throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pointCloudPipelineState)));
+    if (enableBackFaceCulling)
+    {
+      throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineStateWithBackFaceCulling)));
+    }
+    else
+    {
+      throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineStateWithNoCulling)));
+    }
+  }
+ 
 }
 #pragma endregion
 
