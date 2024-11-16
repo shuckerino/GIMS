@@ -4,6 +4,7 @@ namespace gims
 AABB::AABB()
     : m_lowerLeftBottom(std::numeric_limits<f32>::max())
     , m_upperRightTop(-std::numeric_limits<f32>::max())
+    , m_center(-1.0f)
 {
 }
 AABB::AABB(f32v3 const* const positions, ui32 nPositions)
@@ -36,9 +37,14 @@ f32m4 AABB::getNormalizationTransformation() const
 }
 AABB AABB::getUnion(const AABB& other) const
 {
-  (void)other;
-  // Assignment 2
-  return *this;
+  // To calculate the union of two bounding boxes, we need to do the following...
+  // Make new AABB with min of lower left corners and max of top right corners
+  const auto minLowerLeft   = glm::min(this->m_lowerLeftBottom, other.m_lowerLeftBottom);
+  const auto maxUpperRight  = glm::min(this->m_upperRightTop, other.m_upperRightTop);
+  auto       newAABB        = AABB();
+  newAABB.m_lowerLeftBottom = minLowerLeft;
+  newAABB.m_upperRightTop   = maxUpperRight;
+  return newAABB;
 }
 const f32v3& AABB::getLowerLeftBottom()
 {
@@ -50,8 +56,9 @@ const f32v3& AABB::getUpperRightTop() const
 }
 AABB AABB::getTransformed(f32m4& transformation) const
 {
-  (void)transformation;
-  // Assignment 2
-  return *this;
+  auto transformedAABB = AABB();
+  transformedAABB.m_lowerLeftBottom = f32v4(this->m_lowerLeftBottom, 1.0f) * transformation;
+  transformedAABB.m_upperRightTop   = f32v4(this->m_upperRightTop, 1.0f) * transformation;
+  return transformedAABB;
 }
 } // namespace gims

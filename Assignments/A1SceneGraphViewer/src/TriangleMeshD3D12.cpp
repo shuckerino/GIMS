@@ -28,19 +28,63 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
     , m_aabb(positions, nVertices)
     , m_materialIndex(materialIndex)
 {
-  // Assignment 2
-  (void)positions;
-  (void)normals;
-  (void)textureCoordinates;
-  (void)indexBuffer;
-  (void)device;
-  (void)commandQueue;
+#pragma region Vertex Buffer
+
+  // Init vertex buffer
+  auto vertexBuffer = std::vector<Vertex>(nVertices);
+  for (ui32 i = 0; i < nVertices; i++)
+  {
+    Vertex v {
+        v.position          = positions[i],
+        v.normal            = normals[i],
+        v.textureCoordinate = textureCoordinates[i],
+    };
+    vertexBuffer[i] = v;
+  }
+
+  m_vertexBufferSize = nVertices * sizeof(Vertex);
+
+  UploadHelper uploadHelperVertexBuffer(device, m_vertexBufferSize);
+  // Create resource on GPU
+  const CD3DX12_RESOURCE_DESC   vertexBufferDescription = CD3DX12_RESOURCE_DESC::Buffer(m_vertexBufferSize);
+  const CD3DX12_HEAP_PROPERTIES defaultHeapProperties   = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+  device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &vertexBufferDescription,
+                                  D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_vertexBuffer));
+
+  // Upload to GPU
+  uploadHelperVertexBuffer.uploadBuffer(vertexBuffer.data(), m_vertexBuffer, m_vertexBufferSize, commandQueue);
+  m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+  m_vertexBufferView.SizeInBytes    = m_vertexBufferSize;
+  m_vertexBufferView.StrideInBytes  = sizeof(Vertex);
+
+#pragma endregion
+
+#pragma region Index Buffer
+
+  m_indexBufferSize = nIndices * sizeof(ui32v3);
+  UploadHelper                uploadHelperIndexBuffer(device, m_indexBufferSize);
+  const CD3DX12_RESOURCE_DESC indexBufferDescription = CD3DX12_RESOURCE_DESC::Buffer(m_indexBufferSize);
+  device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &indexBufferDescription,
+                                  D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_indexBuffer));
+
+  uploadHelperIndexBuffer.uploadBuffer(indexBuffer, m_indexBuffer, m_indexBufferSize, commandQueue);
+  m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+  m_indexBufferView.SizeInBytes    = m_indexBufferSize;
+  m_indexBufferView.Format         = DXGI_FORMAT_R32_UINT;
+
+#pragma endregion
+
+#pragma region Texture
+
+
+
+#pragma endregion
 }
 
 void TriangleMeshD3D12::addToCommandList(const ComPtr<ID3D12GraphicsCommandList>& commandList) const
 {
-  (void)commandList;
-// Assignment 2
+  commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+  commandList->IASetIndexBuffer(&m_indexBufferView);
 }
 
 const AABB TriangleMeshD3D12::getAABB() const

@@ -63,13 +63,15 @@ public:
   TriangleMeshD3D12& operator=(TriangleMeshD3D12&& other) noexcept = default;
 
 private:
-  ui32                   m_nIndices;         //! Number of indices in the index buffer.
-  ui32                   m_vertexBufferSize; //! Vertex buffer size in bytes.
-  ui32                   m_indexBufferSize;  //! Index buffer size in bytes.
-  AABB                   m_aabb;             //! Axis aligned bounding box of the mesh.
-  ui32                   m_materialIndex;    //! Material index of the mesh.
-  ComPtr<ID3D12Resource> m_vertexBuffer;     //! The vertex buffer on the GPU.
-  ComPtr<ID3D12Resource> m_indexBuffer;      //! The index buffer on the GPU.
+  ui32                     m_nIndices;         //! Number of indices in the index buffer.
+  ui32                     m_vertexBufferSize; //! Vertex buffer size in bytes.
+  ui32                     m_indexBufferSize;  //! Index buffer size in bytes.
+  AABB                     m_aabb;             //! Axis aligned bounding box of the mesh.
+  ui32                     m_materialIndex;    //! Material index of the mesh.
+  ComPtr<ID3D12Resource>   m_vertexBuffer;     //! The vertex buffer on the GPU.
+  ComPtr<ID3D12Resource>   m_indexBuffer;      //! The index buffer on the GPU.
+  D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+  D3D12_INDEX_BUFFER_VIEW  m_indexBufferView;
 
   //! Input element descriptor defining the vertex format.
   static const std::vector<D3D12_INPUT_ELEMENT_DESC> m_inputElementDescs;

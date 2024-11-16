@@ -30,7 +30,11 @@ void ConstantBufferD3D12::upload(void const* const data)
   {
     return;
   }
-  (void)data;
-  // Assignemt 2
+
+  // Copy constant buffer to GPU
+  void*       p;
+  m_constantBuffer->Map(0, nullptr, &p);
+  ::memcpy(p, &data, sizeof(data));
+  m_constantBuffer->Unmap(0, nullptr);
 }
 } // namespace gims
