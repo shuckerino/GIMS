@@ -82,10 +82,66 @@ void SceneGraphViewerApp::createRootSignature()
   rootSignatureDescription.Init(_countof(rootParameters), rootParameters, 0, nullptr,
                                 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
-  ComPtr<ID3DBlob> rootBlob, errorBlob;
-  D3D12SerializeRootSignature(&rootSignatureDescription, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
+  // Descriptor Range für Constant Buffers (b0, b1, b2)
+  // D3D12_DESCRIPTOR_RANGE descriptorRangeCBV            = {};
+  // descriptorRangeCBV.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+  // descriptorRangeCBV.NumDescriptors                    = 3; // Drei Constant Buffers
+  // descriptorRangeCBV.BaseShaderRegister                = 0; // b0
+  // descriptorRangeCBV.RegisterSpace                     = 0;
+  // descriptorRangeCBV.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+  //
+  //// Descriptor Range für Texturen (t0 bis t4)
+  // D3D12_DESCRIPTOR_RANGE descriptorRangeSRV            = {};
+  // descriptorRangeSRV.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+  // descriptorRangeSRV.NumDescriptors                    = 5; // Fünf Texturen
+  // descriptorRangeSRV.BaseShaderRegister                = 0; // t0
+  // descriptorRangeSRV.RegisterSpace                     = 0;
+  // descriptorRangeSRV.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+  //
+  //// Root Parameter für Constant Buffers
+  // D3D12_ROOT_PARAMETER rootParameters[3] = {};
+  //
+  //// Constant Buffers (Descriptor Table)
+  // rootParameters[0].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+  // rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
+  // rootParameters[0].DescriptorTable.pDescriptorRanges   = &descriptorRangeCBV;
+  // rootParameters[0].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
+  //
+  //// Texturen (Descriptor Table)
+  // rootParameters[1].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+  // rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
+  // rootParameters[1].DescriptorTable.pDescriptorRanges   = &descriptorRangeSRV;
+  // rootParameters[1].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;
+  //
+  //// Sampler (Descriptor Table)
+  // D3D12_STATIC_SAMPLER_DESC sampler = {};
+  // sampler.Filter                    = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+  // sampler.AddressU                  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+  // sampler.AddressV                  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+  // sampler.AddressW                  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+  // sampler.MipLODBias                = 0;
+  // sampler.MaxAnisotropy             = 1;
+  // sampler.ComparisonFunc            = D3D12_COMPARISON_FUNC_ALWAYS;
+  // sampler.BorderColor               = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+  // sampler.MinLOD                    = 0.0f;
+  // sampler.MaxLOD                    = D3D12_FLOAT32_MAX;
+  // sampler.ShaderRegister            = 0; // s0
+  // sampler.RegisterSpace             = 0;
+  // sampler.ShaderVisibility          = D3D12_SHADER_VISIBILITY_PIXEL;
+  //
+  //// Root Signature Description
+  // D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+  // rootSignatureDesc.NumParameters             = _countof(rootParameters);
+  // rootSignatureDesc.pParameters               = rootParameters;
+  // rootSignatureDesc.NumStaticSamplers         = 1;
+  // rootSignatureDesc.pStaticSamplers           = &sampler;
+  // rootSignatureDesc.Flags                     = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
-  getDevice()->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature));
+  ComPtr<ID3DBlob> rootBlob, errorBlob;
+  D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
+
+  getDevice()->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(),
+                                   IID_PPV_ARGS(&m_rootSignature));
 }
 
 void SceneGraphViewerApp::createPipeline()

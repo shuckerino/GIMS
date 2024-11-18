@@ -11,15 +11,27 @@ using namespace gims;
 namespace
 {
 /// <summary>
-/// Converts the index buffer required for D3D12 renndering from an aiMesh.
+/// Converts the index buffer required for D3D12 rendering from an aiMesh.
 /// </summary>
 /// <param name="mesh">The ai mesh containing an index buffer.</param>
 /// <returns></returns>
 std::vector<ui32v3> getTriangleIndicesFromAiMesh(aiMesh const* const mesh)
 {
   std::vector<ui32v3> result;
-  // Assignment 3
-  (void)mesh;
+  if (!mesh->HasFaces())
+    return result;
+
+  result.reserve(mesh->mNumFaces);
+  for (ui32 i = 0; i < mesh->mNumFaces; i++)
+  {
+    const aiFace& currentFace = mesh->mFaces[i];
+    if (currentFace.mNumIndices == 3)
+    {
+      const ui32v3 faceIndices = ui32v3(currentFace.mIndices[0], currentFace.mIndices[1], currentFace.mIndices[2]);
+      result.emplace_back(faceIndices);
+    }
+  }
+
   return result;
 }
 
@@ -134,14 +146,48 @@ Scene SceneGraphFactory::createFromAssImpScene(const std::filesystem::path      
   return outputScene;
 }
 
+/// <summary>
+/// Method calling TriangleMeshD3D12::TriangleMeshD3D12 for each mesh in inputScene
+/// </summary>
+/// <param name="inputScene"></param>
+/// <param name="device"></param>
+/// <param name="commandQueue"></param>
+/// <param name="outputScene"></param>
 void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComPtr<ID3D12Device>& device,
                                      const ComPtr<ID3D12CommandQueue>& commandQueue, Scene& outputScene)
 {
-  // Assignment 3
-  (void)inputScene;
-  (void)device;
-  (void)commandQueue;
-  (void)outputScene;
+  // TODO: check if hasNormals, TextCoords etc.
+
+  for (ui32 i = 0; i < inputScene->mNumMeshes; i++)
+  {
+    const aiMesh* currentMesh = inputScene->mMeshes[i];
+
+    // get positions and normals
+    const ui32         numVertices = currentMesh->mNumVertices;
+    std::vector<f32v3> positions(numVertices);
+    std::vector<f32v3> normals(numVertices);
+    std::vector<f32v3> textureCoords(numVertices);
+    for (ui32 n = 0; n < numVertices; n++)
+    {
+      const aiVector3D& currentPos      = currentMesh->mVertices[n];
+      const aiVector3D& currentNormal   = currentMesh->mNormals[n];
+      const aiVector3D& currentTexCoord = currentMesh->mTextureCoords[0][n]; // does this make sense?
+      positions.emplace_back(f32v3(currentPos.x, currentPos.y, currentPos.z));
+      normals.emplace_back(f32v3(currentNormal.x, currentNormal.y, currentNormal.z));
+      textureCoords.emplace_back(f32v3(currentTexCoord.x, currentTexCoord.y, currentTexCoord.z));
+    }
+
+    // get triangle indices
+    const std::vector<ui32v3> indexBuffer     = getTriangleIndicesFromAiMesh(currentMesh);
+    const ui32                indexBufferSize = static_cast<ui32>(indexBuffer.size());
+
+    // create internal mesh
+    TriangleMeshD3D12 createdMesh = TriangleMeshD3D12::TriangleMeshD3D12(
+        positions.data(), normals.data(), textureCoords.data(), numVertices, indexBuffer.data(), indexBufferSize,
+        currentMesh->mMaterialIndex, device, commandQueue);
+
+    outputScene.m_meshes.emplace_back(createdMesh);
+  }
 }
 
 ui32 SceneGraphFactory::createNodes(aiScene const* const inputScene, Scene& outputScene, aiNode const* const inputNode)

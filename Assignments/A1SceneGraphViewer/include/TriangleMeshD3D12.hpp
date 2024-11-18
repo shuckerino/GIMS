@@ -16,7 +16,7 @@ class TriangleMeshD3D12
 {
 public:
   /// <summary>
-  /// Constructor that creates a D3D12 GPU Triangle mesh from positions, normals, and texture coordiantes.
+  /// Constructor that creates a D3D12 GPU Triangle mesh from positions, normals, and texture coordinates.
   /// </summary>
   /// <param name="positions">Array of 3D positions. There must be nVertices elements in this array.</param>
   /// <param name="normals">Array of 3D normal vector. There must be nVertices elements in this array.</param>
@@ -33,7 +33,7 @@ public:
                     const ComPtr<ID3D12Device>& device, const ComPtr<ID3D12CommandQueue>& commandQueue);
 
   /// <summary>
-  /// Adds the commands neccessary for rendering this triangle mesh to the provided commandList.
+  /// Adds the commands necessary for rendering this triangle mesh to the provided commandList.
   /// </summary>
   /// <param name="commandList">The command list</param>
   void addToCommandList(const ComPtr<ID3D12GraphicsCommandList>& commandList) const;
@@ -77,4 +77,4 @@ private:
   static const std::vector<D3D12_INPUT_ELEMENT_DESC> m_inputElementDescs;
 };
 
-} // namespace gims
+}

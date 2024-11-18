@@ -74,11 +74,6 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
 
 #pragma endregion
 
-#pragma region Texture
-
-
-
-#pragma endregion
 }
 
 void TriangleMeshD3D12::addToCommandList(const ComPtr<ID3D12GraphicsCommandList>& commandList) const
