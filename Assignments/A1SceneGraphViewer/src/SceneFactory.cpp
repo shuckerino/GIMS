@@ -172,9 +172,9 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
       const aiVector3D& currentPos      = currentMesh->mVertices[n];
       const aiVector3D& currentNormal   = currentMesh->mNormals[n];
       const aiVector3D& currentTexCoord = currentMesh->mTextureCoords[0][n]; // does this make sense?
-      positions.emplace_back(f32v3(currentPos.x, currentPos.y, currentPos.z));
-      normals.emplace_back(f32v3(currentNormal.x, currentNormal.y, currentNormal.z));
-      textureCoords.emplace_back(f32v3(currentTexCoord.x, currentTexCoord.y, currentTexCoord.z));
+      positions.emplace_back(currentPos.x, currentPos.y, currentPos.z);
+      normals.emplace_back(currentNormal.x, currentNormal.y, currentNormal.z);
+      textureCoords.emplace_back(currentTexCoord.x, currentTexCoord.y, currentTexCoord.z);
     }
 
     // get triangle indices
