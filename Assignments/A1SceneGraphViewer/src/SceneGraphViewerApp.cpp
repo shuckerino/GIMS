@@ -23,70 +23,15 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
   createPipeline();
 }
 
-void SceneGraphViewerApp::onDraw()
-{
-  if (!ImGui::GetIO().WantCaptureMouse)
-  {
-    bool pressed  = ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
-    bool released = ImGui::IsMouseReleased(ImGuiMouseButton_Left) || ImGui::IsMouseReleased(ImGuiMouseButton_Right);
-    if (pressed || released)
-    {
-      bool left = ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseReleased(ImGuiMouseButton_Left);
-      m_examinerController.click(pressed, left == true ? 1 : 2,
-                                 ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl),
-                                 getNormalizedMouseCoordinates());
-    }
-    else
-    {
-      m_examinerController.move(getNormalizedMouseCoordinates());
-    }
-  }
-
-  const auto commandList = getCommandList();
-  const auto rtvHandle   = getRTVHandle();
-  const auto dsvHandle   = getDSVHandle();
-
-  commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-
-  const float clearColor[] = {m_uiData.m_backgroundColor.x, m_uiData.m_backgroundColor.y, m_uiData.m_backgroundColor.z,
-                              1.0f};
-  commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-  commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-  commandList->RSSetViewports(1, &getViewport());
-  commandList->RSSetScissorRects(1, &getRectScissor());
-
-  drawScene(commandList);
-}
-
-void SceneGraphViewerApp::onDrawUI()
-{
-  const auto imGuiFlags = m_examinerController.active() ? ImGuiWindowFlags_NoInputs : ImGuiWindowFlags_None;
-  ImGui::Begin("Information", nullptr, imGuiFlags);
-  ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
-  ImGui::End();
-  ImGui::Begin("Configuration", nullptr, imGuiFlags);
-  ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
-  ImGui::End();
-}
+#pragma region Init
 
 void SceneGraphViewerApp::createRootSignature()
 {
-  //CD3DX12_ROOT_PARAMETER rootParameters[1] = {};
-
-  //CD3DX12_DESCRIPTOR_RANGE constantBufferTable;
-  //constantBufferTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 3, 0);
-  //rootParameters[0].InitAsDescriptorTable(3, &constantBufferTable);
-
-  //CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDescription;
-  //rootSignatureDescription.Init(_countof(rootParameters), rootParameters, 0, nullptr,
-  //                              D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-  // Descriptor Range für Constant Buffers (b0, b1, b2)
+  // Descriptor Range für Constant Buffers b1, b2
   D3D12_DESCRIPTOR_RANGE descriptorRangeCBV            = {};
   descriptorRangeCBV.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-  descriptorRangeCBV.NumDescriptors                    = 3; // Drei Constant Buffers
-  descriptorRangeCBV.BaseShaderRegister                = 0; // b0
+  descriptorRangeCBV.NumDescriptors                    = 2; // Zwei Constant Buffers
+  descriptorRangeCBV.BaseShaderRegister                = 1; // b1
   descriptorRangeCBV.RegisterSpace                     = 0;
   descriptorRangeCBV.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
@@ -99,19 +44,25 @@ void SceneGraphViewerApp::createRootSignature()
   descriptorRangeSRV.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
   // Root Parameter für Constant Buffers
-  D3D12_ROOT_PARAMETER rootParameters[2] = {};
+  D3D12_ROOT_PARAMETER rootParameters[3] = {};
 
-  // Constant Buffers (Descriptor Table)
-  rootParameters[0].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-  rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
-  rootParameters[0].DescriptorTable.pDescriptorRanges   = &descriptorRangeCBV;
-  rootParameters[0].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
+  // First parameter needs to be Scene constant buffer because of draw call
+  rootParameters[0].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
+  rootParameters[0].Descriptor.ShaderRegister = 0; // b0
+  rootParameters[0].Descriptor.RegisterSpace  = 0;
+  rootParameters[0].ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
 
-  // Texturen (Descriptor Table)
+  // Other two constant Buffers (Descriptor Table)
   rootParameters[1].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
   rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
-  rootParameters[1].DescriptorTable.pDescriptorRanges   = &descriptorRangeSRV;
-  rootParameters[1].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;
+  rootParameters[1].DescriptorTable.pDescriptorRanges   = &descriptorRangeCBV;
+  rootParameters[1].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
+
+  // Texturen (Descriptor Table)
+  rootParameters[2].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+  rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
+  rootParameters[2].DescriptorTable.pDescriptorRanges   = &descriptorRangeSRV;
+  rootParameters[2].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;
 
   // Sampler (Descriptor Table)
   D3D12_STATIC_SAMPLER_DESC sampler = {};
@@ -176,11 +127,62 @@ void SceneGraphViewerApp::createPipeline()
   throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 }
 
+#pragma endregion
+
+#pragma region OnDraw
+
+void SceneGraphViewerApp::onDraw()
+{
+  if (!ImGui::GetIO().WantCaptureMouse)
+  {
+    bool pressed  = ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
+    bool released = ImGui::IsMouseReleased(ImGuiMouseButton_Left) || ImGui::IsMouseReleased(ImGuiMouseButton_Right);
+    if (pressed || released)
+    {
+      bool left = ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+      m_examinerController.click(pressed, left == true ? 1 : 2,
+                                 ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl),
+                                 getNormalizedMouseCoordinates());
+    }
+    else
+    {
+      m_examinerController.move(getNormalizedMouseCoordinates());
+    }
+  }
+
+  const auto commandList = getCommandList();
+  const auto rtvHandle   = getRTVHandle();
+  const auto dsvHandle   = getDSVHandle();
+
+  commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+
+  const float clearColor[] = {m_uiData.m_backgroundColor.x, m_uiData.m_backgroundColor.y, m_uiData.m_backgroundColor.z,
+                              1.0f};
+  commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+  commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+  commandList->RSSetViewports(1, &getViewport());
+  commandList->RSSetScissorRects(1, &getRectScissor());
+
+  drawScene(commandList);
+}
+
+void SceneGraphViewerApp::onDrawUI()
+{
+  const auto imGuiFlags = m_examinerController.active() ? ImGuiWindowFlags_NoInputs : ImGuiWindowFlags_None;
+  ImGui::Begin("Information", nullptr, imGuiFlags);
+  ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
+  ImGui::End();
+  ImGui::Begin("Configuration", nullptr, imGuiFlags);
+  ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
+  ImGui::End();
+}
+
 void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmdLst)
 {
   updateSceneConstantBuffer();
   // Assigment 2: Uncomment after successfull implementation.
-  // const auto cb                   = m_constantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
+  const auto cb           = m_constantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
   const auto cameraMatrix = m_examinerController.getTransformationMatrix();
 
   // Assignment 6
@@ -188,11 +190,16 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
   cmdLst->SetPipelineState(m_pipelineState.Get());
 
   // Assigment 2: Uncomment after successfull implementation.
-  // cmdLst->SetGraphicsRootSignature(m_rootSignature.Get());
-  // cmdLst->SetGraphicsRootConstantBufferView(0, cb);
+  cmdLst->SetGraphicsRootSignature(m_rootSignature.Get());
+  cmdLst->SetGraphicsRootConstantBufferView(0, cb);
 
   m_scene.addToCommandList(cmdLst, cameraMatrix, 1, 2, 3);
+
+  // try drawing single meshes for Assignment 2
+  m_scene.getMesh(0).addToCommandList(cmdLst);
 }
+
+#pragma endregion
 
 namespace
 {
