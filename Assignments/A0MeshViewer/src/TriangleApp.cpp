@@ -58,8 +58,8 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
     , m_examinerController(true)
 {
   // set ui data to defaults
-  m_uiData.m_viewPortHeight          = static_cast<f32>(config.height);
-  m_uiData.m_viewPortWidth           = static_cast<f32>(config.width);
+  m_uiData.m_viewPortHeight          = static_cast<f32>(getHeight());
+  m_uiData.m_viewPortWidth           = static_cast<f32>(getWidth());
   m_uiData.m_backgroundColor         = f32v4(0.6f, 0.6f, 0.6f, 1.0f);
   m_uiData.m_wireFrameColor          = f32v4(0.0f, 0.0f, 0.0f, 1.0f);
   m_uiData.m_ambientColor            = f32v4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -244,12 +244,11 @@ void MeshViewer::createPipeline(bool enableBackFaceCulling, bool enableWireFrame
     psoDesc.DSVFormat                            = getDX12AppConfig().depthBufferFormat;
     psoDesc.DepthStencilState.DepthEnable        = TRUE;
     psoDesc.DepthStencilState.DepthFunc          = D3D12_COMPARISON_FUNC_LESS;
-    psoDesc.DepthStencilState.DepthWriteMask     = D3D12_DEPTH_WRITE_MASK_ZERO;
+    psoDesc.DepthStencilState.DepthWriteMask     = D3D12_DEPTH_WRITE_MASK_ALL;
     psoDesc.DepthStencilState.StencilEnable      = FALSE;
-    psoDesc.RasterizerState.DepthBias            = 1;
-    psoDesc.RasterizerState.DepthBiasClamp       = 0.0f;
-    psoDesc.RasterizerState.SlopeScaledDepthBias = -0.5f;
-
+    psoDesc.RasterizerState.DepthBias            = -1;
+    psoDesc.RasterizerState.DepthBiasClamp       = -100.0f;
+    psoDesc.RasterizerState.SlopeScaledDepthBias = -1.0f;
 
     if (enableBackFaceCulling)
     {
@@ -432,15 +431,23 @@ void MeshViewer::updateConstantBuffer()
   //  cb.wireFrameColor = f32v4(m_uiData.m_wireFrameColor, 1.0f);
   updateUIData(&cb);
 
-  const auto pos_pointer = &m_VertexBufferCPU.data()->position;
-  f32m4      modelMatrix = getNormalizationTransformation(pos_pointer, static_cast<ui32>(m_VertexBufferCPU.size()));
+  // get vector of positions of vertices to pass to "getNormalizationTransformation"
+  std::vector<f32v3> vertexPositions = std::vector<f32v3>();
+  vertexPositions.resize(m_VertexBufferCPU.size());
+  for (const Vertex& v : m_VertexBufferCPU)
+  {
+    vertexPositions.emplace_back(v.position);
+  }
+
+  f32m4 modelMatrix =
+      getNormalizationTransformation(vertexPositions.data(), static_cast<ui32>(m_VertexBufferCPU.size()));
 
   f32m4 viewMatrix = m_examinerController.getTransformationMatrix();
 
-  f32m4 projMatrix =
-      glm::perspectiveFovLH_ZO(glm::radians(30.0f), static_cast<f32>(getWidth()), static_cast<f32>(getHeight()), 0.05f, 1000.0f);
-  const auto mv  = viewMatrix * modelMatrix;
-  const auto mvp = projMatrix * mv;
+  f32m4      projMatrix = glm::perspectiveFovLH_ZO(glm::radians(30.0f), static_cast<f32>(getWidth()),
+                                                   static_cast<f32>(getHeight()), 0.05f, 1000.0f);
+  const auto mv         = viewMatrix * modelMatrix;
+  const auto mvp        = projMatrix * mv;
 
   // MVP matrix
   cb.mv  = mv;
@@ -538,8 +545,8 @@ void MeshViewer::onDraw()
 
   commandList->DrawIndexedInstanced(static_cast<ui32>(m_indexBuffer.size()), 1, 0, 0, 0);
 
-  // check if wire frame should also be drawn
-  if (m_uiData.m_wireFrameEnabled)
+  // check if wire frame should also be drawn (only if NOT in point cloud mode)
+  if (!m_uiData.m_usePointCloud && m_uiData.m_wireFrameEnabled)
   {
     commandList->SetPipelineState(m_uiData.m_backFaceCullingEnabled ? m_wireFramePipelineStateWithBackFaceCulling.Get()
                                                                     : m_wireFramePipelineStateWithNoCulling.Get());
@@ -553,12 +560,16 @@ void MeshViewer::onDrawUI()
 {
   const auto imGuiFlags = m_examinerController.active() ? ImGuiWindowFlags_NoInputs : ImGuiWindowFlags_None;
 
-  //m_uiData.m_viewPortHeight = ImGui::GetMainViewport()->WorkSize.y;
-  //m_uiData.m_viewPortWidth  = ImGui::GetMainViewport()->WorkSize.x;
+  m_uiData.m_viewPortHeight = f32(getHeight());
+  m_uiData.m_viewPortWidth  = f32(getWidth());
 
   // Configuration window
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::Text("Frame time: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
+  ImGui::Text("Viewport Width: %f", m_uiData.m_viewPortWidth);
+  ImGui::Text("Viewport Height: %f", m_uiData.m_viewPortHeight);
+  ImGui::Text("Aspect Ratio: %f", m_uiData.m_viewPortWidth / m_uiData.m_viewPortHeight);
+
   ImGui::Checkbox("Back-Face Culling", &m_uiData.m_backFaceCullingEnabled);
   ImGui::Checkbox("Overlay Wire Frame", &m_uiData.m_wireFrameEnabled);
   ImGui::ColorEdit3("Wire Frame Color", &m_uiData.m_wireFrameColor.x);
