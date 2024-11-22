@@ -181,6 +181,7 @@ void MeshViewer::createTexture()
   textureDescription.SampleDesc.Quality  = 0;
   textureDescription.Dimension           = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 
+  // default heap properties (because frequently accessed)
   const auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
   throwIfFailed(getDevice()->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &textureDescription,
                                                      D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_texture)));
@@ -290,7 +291,7 @@ void MeshViewer::createPipeline(bool enableBackFaceCulling, bool enableWireFrame
     throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pointCloudPipelineState)));
 
   }
-  else
+  else 
   {
     vertexShader = compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_main", L"vs_6_0");
 
@@ -385,7 +386,7 @@ void MeshViewer::uploadVertexBufferToGPU()
   // 1. Create vertex buffer description (resource description)
   const auto vertexBufferDescription = CD3DX12_RESOURCE_DESC::Buffer(m_vertexBufferSize);
 
-  // 2. Create default heap properties
+  // 2. Create default heap properties (because frequently accessed by GPU)
   const auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
   getDevice()->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &vertexBufferDescription,
@@ -404,7 +405,7 @@ void MeshViewer::uploadIndexBufferToGPU()
   // 1. Create index buffer description
   const auto indexBufferDescription = CD3DX12_RESOURCE_DESC::Buffer(m_indexBufferSize);
 
-  // 2. Create upload heap properties
+  // 2. Create upload heap properties (map memory, write from CPU and read from GPU)
   const auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
   getDevice()->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &indexBufferDescription,
@@ -433,7 +434,7 @@ void MeshViewer::updateConstantBuffer()
   f32m4 viewMatrix = m_examinerController.getTransformationMatrix();
 
   f32m4 projMatrix =
-      glm::perspectiveFovLH_ZO(glm::radians(30.0f), m_uiData.m_viewPortWidth, m_uiData.m_viewPortHeight, 0.1f, 100.0f);
+      glm::perspectiveFovLH_ZO(glm::radians(30.0f), m_uiData.m_viewPortWidth, m_uiData.m_viewPortHeight, 0.05f, 100.0f);
   const auto mv  = viewMatrix * modelMatrix;
   const auto mvp = projMatrix * mv;
 
@@ -519,7 +520,7 @@ void MeshViewer::onDraw()
     commandList->SetPipelineState(m_pointCloudPipelineState.Get());
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
   }
-  else
+  else // normal draw call
   {
     commandList->SetPipelineState(m_uiData.m_backFaceCullingEnabled ? m_pipelineStateWithBackFaceCulling.Get()
                                                                     : m_pipelineStateWithNoCulling.Get());
@@ -533,6 +534,7 @@ void MeshViewer::onDraw()
 
   commandList->DrawIndexedInstanced(static_cast<ui32>(m_indexBuffer.size()), 1, 0, 0, 0);
 
+  // check if wire frame should also be drawn
   if (m_uiData.m_wireFrameEnabled)
   {
     commandList->SetPipelineState(m_uiData.m_backFaceCullingEnabled ? m_wireFramePipelineStateWithBackFaceCulling.Get()
