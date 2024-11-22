@@ -23,11 +23,11 @@ f32m4 getNormalizationTransformation(f32v3 const* const positions, ui32 nPositio
 
   // We need to translate the vertices to the center of the cuboid
   // Therefore we first need to calculate the center of mass of the vertices
-  f32v3 centerOfMass(0.0f);
+  f32v3 centerOfMass(0.0f, 0.0f, 0.0f);
   for (ui32 i = 0; i < nPositions; i++)
   {
     minPos = glm::min(minPos, positions[i]);
-    maxPos = glm::max(minPos, positions[i]);
+    maxPos = glm::max(maxPos, positions[i]);
     centerOfMass += positions[i];
   }
 
@@ -77,10 +77,10 @@ MeshViewer::MeshViewer(const DX12AppConfig config)
   createRootSignature();
 
   createPipeline(false, false, false); // normal without back face culling
-  createPipeline(true, false, false); // normal with back face culling
-  createPipeline(false, true, false); // wire frame without back face culling
-  createPipeline(true, true, false); // wire frame with back face culling
-  createPipeline(false, false, true); // point cloud
+  createPipeline(true, false, false);  // normal with back face culling
+  createPipeline(false, true, false);  // wire frame without back face culling
+  createPipeline(true, true, false);   // wire frame with back face culling
+  createPipeline(false, false, true);  // point cloud
 
   createConstantBufferForEachSwapchainFrame();
   m_examinerController.setTranslationVector(f32v3(0, 0, 3));
@@ -226,36 +226,41 @@ void MeshViewer::createPipeline(bool enableBackFaceCulling, bool enableWireFrame
     D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-    psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
-    psoDesc.pRootSignature                     = m_rootSignature.Get();
-    psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
-    psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
-    psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoDesc.RasterizerState.CullMode           = enableBackFaceCulling ? D3D12_CULL_MODE_BACK : D3D12_CULL_MODE_NONE;
-    psoDesc.RasterizerState.FillMode           = D3D12_FILL_MODE_WIREFRAME;
-    psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    psoDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-    psoDesc.SampleMask                         = UINT_MAX;
-    psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.NumRenderTargets                   = 1;
-    psoDesc.SampleDesc.Count                   = 1;
-    psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
-    psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
-    psoDesc.DepthStencilState.DepthEnable      = TRUE;
-    psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
-    psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ZERO;
-    psoDesc.DepthStencilState.StencilEnable    = FALSE;
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc   = {};
+    psoDesc.InputLayout                          = {inputElementDescs, _countof(inputElementDescs)};
+    psoDesc.pRootSignature                       = m_rootSignature.Get();
+    psoDesc.VS                                   = HLSLCompiler::convert(vertexShader);
+    psoDesc.PS                                   = HLSLCompiler::convert(pixelShader);
+    psoDesc.RasterizerState                      = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.RasterizerState.CullMode             = enableBackFaceCulling ? D3D12_CULL_MODE_BACK : D3D12_CULL_MODE_NONE;
+    psoDesc.RasterizerState.FillMode             = D3D12_FILL_MODE_WIREFRAME;
+    psoDesc.BlendState                           = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoDesc.DepthStencilState                    = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    psoDesc.SampleMask                           = UINT_MAX;
+    psoDesc.PrimitiveTopologyType                = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.NumRenderTargets                     = 1;
+    psoDesc.SampleDesc.Count                     = 1;
+    psoDesc.RTVFormats[0]                        = getDX12AppConfig().renderTargetFormat;
+    psoDesc.DSVFormat                            = getDX12AppConfig().depthBufferFormat;
+    psoDesc.DepthStencilState.DepthEnable        = TRUE;
+    psoDesc.DepthStencilState.DepthFunc          = D3D12_COMPARISON_FUNC_LESS;
+    psoDesc.DepthStencilState.DepthWriteMask     = D3D12_DEPTH_WRITE_MASK_ZERO;
+    psoDesc.DepthStencilState.StencilEnable      = FALSE;
+    psoDesc.RasterizerState.DepthBias            = 1;
+    psoDesc.RasterizerState.DepthBiasClamp       = 0.0f;
+    psoDesc.RasterizerState.SlopeScaledDepthBias = -0.5f;
+
 
     if (enableBackFaceCulling)
     {
-      throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_wireFramePipelineStateWithBackFaceCulling)));
+      throwIfFailed(getDevice()->CreateGraphicsPipelineState(
+          &psoDesc, IID_PPV_ARGS(&m_wireFramePipelineStateWithBackFaceCulling)));
     }
     else
     {
-      throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_wireFramePipelineStateWithNoCulling)));
+      throwIfFailed(
+          getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_wireFramePipelineStateWithNoCulling)));
     }
-   
   }
   else if (enablePointCloudMode)
   {
@@ -265,7 +270,7 @@ void MeshViewer::createPipeline(bool enableBackFaceCulling, bool enableWireFrame
     pixelShader =
         compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"PS_PointCloud", L"ps_6_0");
 
-     D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
+    D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
@@ -289,9 +294,8 @@ void MeshViewer::createPipeline(bool enableBackFaceCulling, bool enableWireFrame
     psoDesc.DepthStencilState.StencilEnable    = FALSE;
 
     throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pointCloudPipelineState)));
-
   }
-  else 
+  else
   {
     vertexShader = compileShader(L"../../../Assignments/A0MeshViewer/Shaders/TriangleMesh.hlsl", L"VS_main", L"vs_6_0");
 
@@ -318,20 +322,20 @@ void MeshViewer::createPipeline(bool enableBackFaceCulling, bool enableWireFrame
     psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
     psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
     psoDesc.DepthStencilState.DepthEnable      = TRUE;
-    psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_LESS;
+    psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_LESS_EQUAL;
     psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ALL;
     psoDesc.DepthStencilState.StencilEnable    = FALSE;
 
     if (enableBackFaceCulling)
     {
-      throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineStateWithBackFaceCulling)));
+      throwIfFailed(
+          getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineStateWithBackFaceCulling)));
     }
     else
     {
       throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineStateWithNoCulling)));
     }
   }
- 
 }
 #pragma endregion
 
@@ -434,7 +438,7 @@ void MeshViewer::updateConstantBuffer()
   f32m4 viewMatrix = m_examinerController.getTransformationMatrix();
 
   f32m4 projMatrix =
-      glm::perspectiveFovLH_ZO(glm::radians(30.0f), m_uiData.m_viewPortWidth, m_uiData.m_viewPortHeight, 0.05f, 100.0f);
+      glm::perspectiveFovLH_ZO(glm::radians(30.0f), static_cast<f32>(getWidth()), static_cast<f32>(getHeight()), 0.05f, 1000.0f);
   const auto mv  = viewMatrix * modelMatrix;
   const auto mvp = projMatrix * mv;
 
@@ -549,8 +553,8 @@ void MeshViewer::onDrawUI()
 {
   const auto imGuiFlags = m_examinerController.active() ? ImGuiWindowFlags_NoInputs : ImGuiWindowFlags_None;
 
-  m_uiData.m_viewPortHeight = ImGui::GetMainViewport()->WorkSize.y;
-  m_uiData.m_viewPortWidth  = ImGui::GetMainViewport()->WorkSize.x;
+  //m_uiData.m_viewPortHeight = ImGui::GetMainViewport()->WorkSize.y;
+  //m_uiData.m_viewPortWidth  = ImGui::GetMainViewport()->WorkSize.x;
 
   // Configuration window
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
