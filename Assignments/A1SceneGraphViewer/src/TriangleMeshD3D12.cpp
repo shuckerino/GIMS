@@ -14,9 +14,12 @@ struct Vertex
 namespace gims
 {
 const std::vector<D3D12_INPUT_ELEMENT_DESC> TriangleMeshD3D12::m_inputElementDescs = {
-    {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-    {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-    {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+    {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT,
+     D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+    {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT,
+     D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+    {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT,
+     D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
 TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* const normals,
                                      f32v3 const* const textureCoordinates, ui32 nVertices,
@@ -61,7 +64,8 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
 
 #pragma region Index Buffer
 
-  indexBufferCPU.reserve(3 * nIndices);
+  ui64 reserveSize = 3 * static_cast<gims::ui64>(nIndices);
+  indexBufferCPU.reserve(reserveSize);
   for (ui32 i = 0; i < nIndices; i++)
   {
     indexBufferCPU.emplace_back(indexBuffer[i].x);
@@ -81,7 +85,6 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
   m_indexBufferView.Format         = DXGI_FORMAT_R32_UINT;
 
 #pragma endregion
-
 }
 
 void TriangleMeshD3D12::addToCommandList(const ComPtr<ID3D12GraphicsCommandList>& commandList) const
