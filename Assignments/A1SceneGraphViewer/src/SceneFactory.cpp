@@ -27,8 +27,7 @@ std::vector<ui32v3> getTriangleIndicesFromAiMesh(aiMesh const* const mesh)
     const aiFace& currentFace = mesh->mFaces[i];
     if (currentFace.mNumIndices == 3)
     {
-      const ui32v3 faceIndices = ui32v3(currentFace.mIndices[0], currentFace.mIndices[1], currentFace.mIndices[2]);
-      result.emplace_back(faceIndices);
+      result.emplace_back(currentFace.mIndices[0], currentFace.mIndices[1], currentFace.mIndices[2]);
     }
   }
 
@@ -164,9 +163,12 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
 
     // get positions and normals
     const ui32         numVertices = currentMesh->mNumVertices;
-    std::vector<f32v3> positions(numVertices);
-    std::vector<f32v3> normals(numVertices);
-    std::vector<f32v3> textureCoords(numVertices);
+    std::vector<f32v3> positions;
+    positions.reserve(numVertices);
+    std::vector<f32v3> normals;
+    normals.reserve(numVertices);
+    std::vector<f32v3> textureCoords;
+    textureCoords.reserve(numVertices);
     for (ui32 n = 0; n < numVertices; n++)
     {
       const aiVector3D& currentPos      = currentMesh->mVertices[n];
@@ -174,7 +176,7 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
       const aiVector3D& currentTexCoord = currentMesh->mTextureCoords[0][n]; // does this make sense?
       positions.emplace_back(currentPos.x, currentPos.y, currentPos.z);
       normals.emplace_back(currentNormal.x, currentNormal.y, currentNormal.z);
-      textureCoords.emplace_back(currentTexCoord.x, currentTexCoord.y, currentTexCoord.z);
+      textureCoords.emplace_back(currentTexCoord.x, currentTexCoord.y, 0.0f); // z dimension usually unused
     }
 
     // get triangle indices
@@ -186,7 +188,7 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
         positions.data(), normals.data(), textureCoords.data(), numVertices, indexBuffer.data(), indexBufferSize,
         currentMesh->mMaterialIndex, device, commandQueue);
 
-    outputScene.m_meshes.emplace_back(createdMesh);
+    outputScene.m_meshes.push_back(createdMesh);
   }
 }
 

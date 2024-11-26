@@ -14,11 +14,11 @@ struct Vertex
 namespace gims
 {
 const std::vector<D3D12_INPUT_ELEMENT_DESC> TriangleMeshD3D12::m_inputElementDescs = {
-    {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT,
+    {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
      D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-    {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT,
+    {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
      D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-    {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT,
+    {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
      D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
 TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* const normals,
@@ -34,18 +34,13 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
 #pragma region Vertex Buffer
 
   // Init vertex buffer
-  auto vertexBuffer = std::vector<Vertex>(nVertices);
+  std::vector<Vertex> vertexBuffer;
+  vertexBuffer.reserve(nVertices);
   for (ui32 i = 0; i < nVertices; i++)
   {
-    Vertex v {
-        v.position          = positions[i],
-        v.normal            = normals[i],
-        v.textureCoordinate = textureCoordinates[i],
-    };
-    vertexBuffer[i] = v;
+    const auto v = Vertex(positions[i], normals[i], textureCoordinates[i]);
+    vertexBuffer.emplace_back(m_aabb.getNormalizationTransformation() * f32v4(v.position, 1.0f));
   }
-
-  m_vertexBufferSize = nVertices * sizeof(Vertex);
 
   UploadHelper uploadHelperVertexBuffer(device, m_vertexBufferSize);
   // Create resource on GPU
@@ -64,7 +59,8 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
 
 #pragma region Index Buffer
 
-  ui64 reserveSize = 3 * static_cast<gims::ui64>(nIndices);
+  ui64              reserveSize = 3 * static_cast<gims::ui64>(nIndices);
+  std::vector<ui32> indexBufferCPU;
   indexBufferCPU.reserve(reserveSize);
   for (ui32 i = 0; i < nIndices; i++)
   {
@@ -72,7 +68,6 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
     indexBufferCPU.emplace_back(indexBuffer[i].y);
     indexBufferCPU.emplace_back(indexBuffer[i].z);
   }
-  m_indexBufferSize = static_cast<ui32>(indexBufferCPU.size()) * 4;
 
   UploadHelper                uploadHelperIndexBuffer(device, m_indexBufferSize);
   const CD3DX12_RESOURCE_DESC indexBufferDescription = CD3DX12_RESOURCE_DESC::Buffer(m_indexBufferSize);
@@ -94,7 +89,7 @@ void TriangleMeshD3D12::addToCommandList(const ComPtr<ID3D12GraphicsCommandList>
 
   // test for assignment 2
   commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-  commandList->DrawIndexedInstanced(static_cast<ui32>(indexBufferCPU.size()), 1, 0, 0, 0);
+  commandList->DrawIndexedInstanced(m_nIndices, 1, 0, 0, 0);
 }
 
 const AABB TriangleMeshD3D12::getAABB() const

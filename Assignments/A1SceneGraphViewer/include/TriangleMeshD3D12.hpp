@@ -72,7 +72,6 @@ private:
   ComPtr<ID3D12Resource>   m_indexBuffer;      //! The index buffer on the GPU.
   D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
   D3D12_INDEX_BUFFER_VIEW  m_indexBufferView;
-  std::vector<ui32>        indexBufferCPU;
 
   //! Input element descriptor defining the vertex format.
   static const std::vector<D3D12_INPUT_ELEMENT_DESC> m_inputElementDescs;

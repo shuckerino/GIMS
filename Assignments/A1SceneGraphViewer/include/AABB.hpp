@@ -64,6 +64,5 @@ private:
   //! The upper right top of the AABB.
   f32v3 m_upperRightTop;
   //! The center of the AABB
-  f32v3 m_center;
 };
 } // namespace gims

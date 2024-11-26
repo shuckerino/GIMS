@@ -47,8 +47,10 @@ private:
   void drawScene(const ComPtr<ID3D12GraphicsCommandList>& commandList);
 
   void createSceneConstantBuffer();
-
   void updateSceneConstantBuffer();
+
+  void createPerMeshConstantBuffer();
+  void updatePerMeshConstantBuffer(f32m4 modelView);
 
   struct UiData
   {
@@ -57,8 +59,9 @@ private:
 
   ComPtr<ID3D12PipelineState>      m_pipelineState;
   ComPtr<ID3D12RootSignature>      m_rootSignature;
-  std::vector<ConstantBufferD3D12> m_constantBuffers;
-  gims::ExaminerController         m_examinerController;  
+  std::vector<ConstantBufferD3D12> m_sceneconstantBuffers;
+  std::vector<ConstantBufferD3D12> m_meshconstantBuffers;
+  gims::ExaminerController         m_examinerController;
   Scene                            m_scene;
   UiData                           m_uiData;
 };
