@@ -19,7 +19,7 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
 {
   m_examinerController.setTranslationVector(f32v3(0, -0.25f, 1.5));
   createRootSignature();
-  //createSceneConstantBuffer();
+   createSceneConstantBuffer();
   createPerMeshConstantBuffer();
   createPipeline();
 }
@@ -92,13 +92,12 @@ void SceneGraphViewerApp::createRootSignature()
   // Root Signature Description
   // D3D12_ROOT_PARAMETER rootParameter = {};
 
-  CD3DX12_ROOT_PARAMETER rootParameter = {};
-  rootParameter.InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
-  //rootParameter[1].InitAsConstantBufferView(1, 0, D3D12_SHADER_VISIBILITY_ALL);
+  CD3DX12_ROOT_PARAMETER rootParameter[2] = {};
+  rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
+  rootParameter[1].InitAsConstantBufferView(1, 0, D3D12_SHADER_VISIBILITY_ALL);
 
   CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-  rootSignatureDesc.Init(1, &rootParameter, 0, nullptr,
-                         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+  rootSignatureDesc.Init(2, rootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
   ComPtr<ID3DBlob> rootBlob, errorBlob;
   D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
@@ -200,9 +199,9 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
   const auto cameraMatrix = m_examinerController.getTransformationMatrix();
   const auto mv           = cameraMatrix * modelMatrix;
   std::cout << "Mv is " << glm::to_string(mv) << std::endl;
-  updatePerMeshConstantBuffer(f32m4(1.0f));
-  //updateSceneConstantBuffer();
-  // Assignment 6
+  updatePerMeshConstantBuffer(mv);
+  updateSceneConstantBuffer();
+  //  Assignment 6
 
   cmdLst->SetPipelineState(m_pipelineState.Get());
 
@@ -210,10 +209,10 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
   cmdLst->SetGraphicsRootSignature(m_rootSignature.Get());
 
   // set both constant buffers
-  //const auto sceneCb = m_sceneconstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
-  const auto meshCb  = m_meshconstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
-  cmdLst->SetGraphicsRootConstantBufferView(0, meshCb);
-  //cmdLst->SetGraphicsRootConstantBufferView(1, meshCb);
+   const auto sceneCb = m_sceneconstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
+  const auto meshCb = m_meshconstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
+   cmdLst->SetGraphicsRootConstantBufferView(0, sceneCb);
+   cmdLst->SetGraphicsRootConstantBufferView(1, meshCb);
 
   m_scene.addToCommandList(cmdLst, cameraMatrix, 1, 2, 3);
 
@@ -256,7 +255,13 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
   std::cout << "Projection is " << glm::to_string(cb.projectionMatrix) << std::endl;
 
-  m_sceneconstantBuffers[getFrameIndex()].upload(&cb);
+  void* p;
+  auto  currentConstantBuffer = m_sceneconstantBuffers[getFrameIndex()].getResource();
+  currentConstantBuffer->Map(0, nullptr, &p);
+  ::memcpy(p, &cb, sizeof(cb));
+  currentConstantBuffer->Unmap(0, nullptr);
+
+  // m_sceneconstantBuffers[getFrameIndex()].upload(&cb);
 }
 
 void SceneGraphViewerApp::createPerMeshConstantBuffer()
@@ -270,9 +275,17 @@ void SceneGraphViewerApp::createPerMeshConstantBuffer()
   }
 }
 
-void SceneGraphViewerApp::updatePerMeshConstantBuffer(f32m4 modelView)
+void SceneGraphViewerApp::updatePerMeshConstantBuffer(const f32m4& modelView)
 {
   PerMeshConstantBuffer cb;
+  (void)modelView;
   cb.modelViewMatrix = modelView;
-  m_meshconstantBuffers[getFrameIndex()].upload(&cb);
+
+  void* p;
+  auto  currentConstantBuffer = m_meshconstantBuffers[getFrameIndex()].getResource();
+  currentConstantBuffer->Map(0, nullptr, &p);
+  ::memcpy(p, &cb, sizeof(cb));
+  currentConstantBuffer->Unmap(0, nullptr);
+
+  // m_meshconstantBuffers[getFrameIndex()].upload(&cb);
 }

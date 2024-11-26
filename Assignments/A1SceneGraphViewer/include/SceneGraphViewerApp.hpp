@@ -50,7 +50,7 @@ private:
   void updateSceneConstantBuffer();
 
   void createPerMeshConstantBuffer();
-  void updatePerMeshConstantBuffer(f32m4 modelView);
+  void updatePerMeshConstantBuffer(const f32m4& modelView);
 
   struct UiData
   {

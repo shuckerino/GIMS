@@ -38,8 +38,9 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
   vertexBuffer.reserve(nVertices);
   for (ui32 i = 0; i < nVertices; i++)
   {
-    const auto v = Vertex(positions[i], normals[i], textureCoordinates[i]);
-    vertexBuffer.emplace_back(m_aabb.getNormalizationTransformation() * f32v4(v.position, 1.0f));
+    // const auto v = Vertex(positions[i], normals[i], textureCoordinates[i]);
+    // vertexBuffer.emplace_back(m_aabb.getNormalizationTransformation() * f32v4(v.position, 1.0f));
+    vertexBuffer.emplace_back(positions[i], normals[i], textureCoordinates[i]);
   }
 
   UploadHelper uploadHelperVertexBuffer(device, m_vertexBufferSize);
