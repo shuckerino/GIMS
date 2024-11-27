@@ -8,9 +8,8 @@ ConstantBufferD3D12::ConstantBufferD3D12()
 {
 }
 ConstantBufferD3D12::ConstantBufferD3D12(size_t sizeInBytes, const ComPtr<ID3D12Device>& device)
+    : m_sizeInBytes(sizeInBytes)
 {
-  m_sizeInBytes = (sizeInBytes + 255) & ~255; // Align to 256 bytes
-
   // For constant buffer we first need to create the constant buffer description
   const CD3DX12_RESOURCE_DESC constantBufferDescription = CD3DX12_RESOURCE_DESC::Buffer(sizeInBytes);
 
@@ -34,7 +33,7 @@ void ConstantBufferD3D12::upload(void const* const data)
   // Copy constant buffer to GPU
   void*       p;
   m_constantBuffer->Map(0, nullptr, &p);
-  ::memcpy(p, &data, sizeof(data));
+  ::memcpy(p, data, m_sizeInBytes);
   m_constantBuffer->Unmap(0, nullptr);
 }
 } // namespace gims

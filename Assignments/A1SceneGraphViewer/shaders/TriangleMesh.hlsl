@@ -44,7 +44,6 @@ VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, f
 float4 PS_main(VertexShaderOutput input)
     : SV_TARGET
 {
-  //return float4(input.viewSpaceNormal.x, input.texCoord.y, 0.0f, 1.0f);
-  return float4(0.2f, 0.8f, 0.8f, 1.0f);
-
+  return float4(input.viewSpaceNormal.x, input.texCoord.y, 0.0f, 1.0f);
+  //return float4(0.2f, 0.8f, 0.8f, 1.0f);
 }

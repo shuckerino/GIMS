@@ -19,7 +19,7 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
 {
   m_examinerController.setTranslationVector(f32v3(0, -0.25f, 1.5));
   createRootSignature();
-   createSceneConstantBuffer();
+  createSceneConstantBuffer();
   createPerMeshConstantBuffer();
   createPipeline();
 }
@@ -122,7 +122,7 @@ void SceneGraphViewerApp::createPipeline()
   psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
   psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
   psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-  psoDesc.RasterizerState.FillMode           = D3D12_FILL_MODE_WIREFRAME;
+  psoDesc.RasterizerState.FillMode           = D3D12_FILL_MODE_SOLID;
   psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_NONE;
   psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
   psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
@@ -209,10 +209,10 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
   cmdLst->SetGraphicsRootSignature(m_rootSignature.Get());
 
   // set both constant buffers
-   const auto sceneCb = m_sceneconstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
-  const auto meshCb = m_meshconstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
-   cmdLst->SetGraphicsRootConstantBufferView(0, sceneCb);
-   cmdLst->SetGraphicsRootConstantBufferView(1, meshCb);
+  const auto sceneCb = m_sceneconstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
+  const auto meshCb  = m_meshconstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
+  cmdLst->SetGraphicsRootConstantBufferView(0, sceneCb);
+  cmdLst->SetGraphicsRootConstantBufferView(1, meshCb);
 
   m_scene.addToCommandList(cmdLst, cameraMatrix, 1, 2, 3);
 
@@ -254,14 +254,7 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
   std::cout << "Projection is " << glm::to_string(cb.projectionMatrix) << std::endl;
-
-  void* p;
-  auto  currentConstantBuffer = m_sceneconstantBuffers[getFrameIndex()].getResource();
-  currentConstantBuffer->Map(0, nullptr, &p);
-  ::memcpy(p, &cb, sizeof(cb));
-  currentConstantBuffer->Unmap(0, nullptr);
-
-  // m_sceneconstantBuffers[getFrameIndex()].upload(&cb);
+  m_sceneconstantBuffers[getFrameIndex()].upload(&cb);
 }
 
 void SceneGraphViewerApp::createPerMeshConstantBuffer()
@@ -280,12 +273,5 @@ void SceneGraphViewerApp::updatePerMeshConstantBuffer(const f32m4& modelView)
   PerMeshConstantBuffer cb;
   (void)modelView;
   cb.modelViewMatrix = modelView;
-
-  void* p;
-  auto  currentConstantBuffer = m_meshconstantBuffers[getFrameIndex()].getResource();
-  currentConstantBuffer->Map(0, nullptr, &p);
-  ::memcpy(p, &cb, sizeof(cb));
-  currentConstantBuffer->Unmap(0, nullptr);
-
-  // m_meshconstantBuffers[getFrameIndex()].upload(&cb);
+  m_meshconstantBuffers[getFrameIndex()].upload(&cb);
 }
