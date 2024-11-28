@@ -1,6 +1,7 @@
 #include "TriangleMeshD3D12.hpp"
 #include <d3dx12/d3dx12.h>
 #include <gimslib/d3d/UploadHelper.hpp>
+#include <iostream>
 namespace
 {
 struct Vertex
@@ -14,12 +15,9 @@ struct Vertex
 namespace gims
 {
 const std::vector<D3D12_INPUT_ELEMENT_DESC> TriangleMeshD3D12::m_inputElementDescs = {
-    {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
-     D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-    {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
-     D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-    {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
-     D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+    {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+    {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+    {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
 TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* const normals,
                                      f32v3 const* const textureCoordinates, ui32 nVertices,
@@ -38,8 +36,8 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
   vertexBuffer.reserve(nVertices);
   for (ui32 i = 0; i < nVertices; i++)
   {
-    // const auto v = Vertex(positions[i], normals[i], textureCoordinates[i]);
-    // vertexBuffer.emplace_back(m_aabb.getNormalizationTransformation() * f32v4(v.position, 1.0f));
+     //const auto v = Vertex(positions[i], normals[i], textureCoordinates[i]);
+     //vertexBuffer.emplace_back(m_aabb.getNormalizationTransformation() * f32v4(v.position, 1.0f));
     vertexBuffer.emplace_back(positions[i], normals[i], textureCoordinates[i]);
   }
 
@@ -60,7 +58,7 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
 
 #pragma region Index Buffer
 
-  ui64              reserveSize = 3 * static_cast<gims::ui64>(nIndices);
+  ui64              reserveSize = static_cast<gims::ui64>(nIndices);
   std::vector<ui32> indexBufferCPU;
   indexBufferCPU.reserve(reserveSize);
   for (ui32 i = 0; i < nIndices; i++)

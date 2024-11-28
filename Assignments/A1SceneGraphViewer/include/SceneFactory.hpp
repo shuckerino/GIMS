@@ -17,7 +17,7 @@ private:
   static void createMeshes(aiScene const* const inputScene, const ComPtr<ID3D12Device>& device,
                            const ComPtr<ID3D12CommandQueue>& commandQueue, Scene& outputScene);
 
-  static ui32 createNodes(aiScene const* const inputScene, Scene& outputScene, aiNode const* const inputNode);
+  static ui32 createNodes(aiScene const* const inputScene, Scene& outputScene, aiNode const* const startNode);
 
   static void computeSceneAABB(Scene& scene, AABB& aabb, ui32 nodeIdx, f32m4 transformation);
 

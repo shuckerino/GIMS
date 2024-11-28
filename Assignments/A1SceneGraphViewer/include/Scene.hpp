@@ -25,6 +25,21 @@ public:
     f32m4             transformation; //! Transformation to parent node.
     std::vector<ui32> meshIndices;    //! Index in the array of meshIndices, i.e., Scene::m_meshes[].
     std::vector<ui32> childIndices;   //! Index in the arroy of nodes, i.e.,Scene::m_nodes[].
+
+    template<typename PreTraversFunction, typename PostTraversFunction, typename... Targs>
+    void traverse(PreTraversFunction preTravers, PostTraversFunction postTravers, Targs... Fargs)
+    {
+      const auto continueTraversal = preTravers(this, Fargs...);
+      if (!continueTraversal)
+      {
+        return;
+      }
+      for (const auto& cIter : this->childIndices)
+      {
+        cIter->traverse(preTravers, postTravers, Fargs...);
+      }
+      postTravers(this, Fargs...);
+    }
   };
 
   /// <summary>
@@ -57,14 +72,14 @@ public:
   const AABB& getAABB() const;
 
   /// <summary>
-  /// Nodes are stored in a flat 1D array. This functions returns the Node at the respecitve index.
+  /// Nodes are stored in a flat 1D array. This functions returns the Node at the respective index.
   /// </summary>
   /// <param name="nodeIdx">Index of the node within the array of nodes.</param>
   /// <returns></returns>
   const Node& getNode(ui32 nodeIdx) const;
 
   /// <summary>
-  /// Nodes are stored in a flat 1D array. This functions returns the Node at the respecitve index.
+  /// Nodes are stored in a flat 1D array. This functions returns the Node at the respective index.
   /// </summary>
   /// <param name="nodeIdx">Index of the node within the array of nodes.</param>
   /// <returns></returns>
@@ -89,7 +104,7 @@ public:
   const Material& getMaterial(ui32 materialIdx) const;
 
   /// <summary>
-  /// Traverse the scene graph and add the draw calls, and all other neccessary commands to the command list.
+  /// Traverse the scene graph and add the draw calls, and all other necessary commands to the command list.
   /// </summary>
   /// <param name="commandList">The command list to which the commands will be added.</param>
   /// <param name="viewMatrix">The view matrix (or camera matrix).</param>
@@ -103,7 +118,7 @@ public:
                         ui32 modelViewRootParameterIdx, ui32 materialConstantsRootParameterIdx,
                         ui32 srvRootParameterIdx);
 
-  // Allow the class SceneGraphFactor access to the privatem mebers.
+  // Allow the class SceneGraphFactor access to the private members.
   friend class SceneGraphFactory;
 
 private:

@@ -195,17 +195,17 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
   const auto meshToDraw  = m_scene.getMesh(1);
   const auto modelMatrix = meshToDraw.getAABB().getNormalizationTransformation();
 
-  // Assigment 2: Uncomment after successfull implementation.
+  // Assignment 2: Uncomment after successful implementation.
   const auto cameraMatrix = m_examinerController.getTransformationMatrix();
   const auto mv           = cameraMatrix * modelMatrix;
-  std::cout << "Mv is " << glm::to_string(mv) << std::endl;
+  //std::cout << "Mv is " << glm::to_string(mv) << std::endl;
   updatePerMeshConstantBuffer(mv);
   updateSceneConstantBuffer();
   //  Assignment 6
 
   cmdLst->SetPipelineState(m_pipelineState.Get());
 
-  // Assigment 2: Uncomment after successfull implementation.
+  // Assignment 2: Uncomment after successful implementation.
   cmdLst->SetGraphicsRootSignature(m_rootSignature.Get());
 
   // set both constant buffers
@@ -222,6 +222,8 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
 }
 
 #pragma endregion
+
+#pragma region Constant Buffer
 
 namespace
 {
@@ -253,7 +255,7 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
   SceneConstantBuffer cb;
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
-  std::cout << "Projection is " << glm::to_string(cb.projectionMatrix) << std::endl;
+  // std::cout << "Projection is " << glm::to_string(cb.projectionMatrix) << std::endl;
   m_sceneconstantBuffers[getFrameIndex()].upload(&cb);
 }
 
@@ -271,7 +273,8 @@ void SceneGraphViewerApp::createPerMeshConstantBuffer()
 void SceneGraphViewerApp::updatePerMeshConstantBuffer(const f32m4& modelView)
 {
   PerMeshConstantBuffer cb;
-  (void)modelView;
   cb.modelViewMatrix = modelView;
   m_meshconstantBuffers[getFrameIndex()].upload(&cb);
 }
+
+#pragma endregion

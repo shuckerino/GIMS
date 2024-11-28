@@ -29,6 +29,10 @@ std::vector<ui32v3> getTriangleIndicesFromAiMesh(aiMesh const* const mesh)
     {
       result.emplace_back(currentFace.mIndices[0], currentFace.mIndices[1], currentFace.mIndices[2]);
     }
+    else
+    {
+      std::cout << "Not 3 indices" << std::endl;
+    }
   }
 
   return result;
@@ -155,8 +159,6 @@ Scene SceneGraphFactory::createFromAssImpScene(const std::filesystem::path      
 void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComPtr<ID3D12Device>& device,
                                      const ComPtr<ID3D12CommandQueue>& commandQueue, Scene& outputScene)
 {
-  // TODO: check if hasNormals, TextCoords etc.
-
   for (ui32 i = 0; i < inputScene->mNumMeshes; i++)
   {
     const aiMesh* currentMesh = inputScene->mMeshes[i];
@@ -171,33 +173,80 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
     textureCoords.reserve(numVertices);
     for (ui32 n = 0; n < numVertices; n++)
     {
-      const aiVector3D& currentPos      = currentMesh->mVertices[n];
-      const aiVector3D& currentNormal   = currentMesh->mNormals[n];
-      const aiVector3D& currentTexCoord = currentMesh->mTextureCoords[0][n]; // does this make sense?
+      const aiVector3D& currentPos = currentMesh->mVertices[n];
+      // const aiVector3D& currentNormal   = currentMesh->mNormals[n];
+      // const aiVector3D& currentTexCoord = currentMesh->mTextureCoords[0][n]; // does this make sense?
       positions.emplace_back(currentPos.x, currentPos.y, currentPos.z);
-      normals.emplace_back(currentNormal.x, currentNormal.y, currentNormal.z);
-      textureCoords.emplace_back(currentTexCoord.x, currentTexCoord.y, 0.0f); // z dimension usually unused
+      // normals.emplace_back(currentNormal.x, currentNormal.y, currentNormal.z);
+      // textureCoords.emplace_back(currentTexCoord.x, currentTexCoord.y, 0.0f); // z dimension usually unused
+
+      if (currentMesh->HasNormals())
+      {
+        const aiVector3D& currentNormal = currentMesh->mNormals[n];
+        normals.emplace_back(currentNormal.x, currentNormal.y, currentNormal.z);
+      }
+      else
+      {
+        normals.emplace_back(0.0f, 0.0f, 0.0f); // Default normal if missing
+      }
+
+      if (currentMesh->HasTextureCoords(0))
+      {
+        const aiVector3D& currentTexCoord = currentMesh->mTextureCoords[0][n];
+        textureCoords.emplace_back(currentTexCoord.x, currentTexCoord.y, 0.0f);
+      }
+      else
+      {
+        textureCoords.emplace_back(0.0f, 0.0f, 0.0f); // Default UV if missing
+      }
     }
 
     // get triangle indices
     const std::vector<ui32v3> indexBuffer     = getTriangleIndicesFromAiMesh(currentMesh);
-    const ui32                indexBufferSize = static_cast<ui32>(indexBuffer.size());
+    const ui32                numIndices = 3 * static_cast<ui32>(indexBuffer.size()); // mul by 3, because of vec3
+    const auto                nMeshes         = inputScene->mMeshes;
+    (void)nMeshes;
+
+    // log data
+    if (i == 0)
+    {
+      std::cout << "-----------Vertex Buffer--------------" << std::endl;
+      for (const auto& p : positions)
+      {
+        std::cout << glm::to_string(p) << "\n";
+      }
+    }
+
+    std::cout << "NumVertices: " << numVertices << std::endl;
+    std::cout << "NumIndices: " << numIndices << std::endl;
 
     // create internal mesh
     TriangleMeshD3D12 createdMesh = TriangleMeshD3D12::TriangleMeshD3D12(
-        positions.data(), normals.data(), textureCoords.data(), numVertices, indexBuffer.data(), indexBufferSize,
+        positions.data(), normals.data(), textureCoords.data(), numVertices, indexBuffer.data(), numIndices,
         currentMesh->mMaterialIndex, device, commandQueue);
 
     outputScene.m_meshes.push_back(createdMesh);
   }
 }
 
-ui32 SceneGraphFactory::createNodes(aiScene const* const inputScene, Scene& outputScene, aiNode const* const inputNode)
+ui32 SceneGraphFactory::createNodes(aiScene const* const inputScene, Scene& outputScene, aiNode const* const startNode)
 {
   (void)inputScene;
   (void)outputScene;
-  (void)inputNode;
+  (void)startNode;
   // Assignment 4
+
+  // auto preTraversal = [&](Scene::Node* node, int& depth) -> bool
+  //{
+  //   ++depth;
+  //   //maxDepth = std::max(maxDepth, depth);
+  //   return true; // Continue traversal
+  // };
+
+  //// recursively fill outputScene.m_nodes and set node member
+  // Scene::Node rootNode = Scene::Node();
+  ////rootNode.traverse();
+
   return 0;
 }
 
