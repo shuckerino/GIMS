@@ -174,11 +174,7 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
     for (ui32 n = 0; n < numVertices; n++)
     {
       const aiVector3D& currentPos = currentMesh->mVertices[n];
-      // const aiVector3D& currentNormal   = currentMesh->mNormals[n];
-      // const aiVector3D& currentTexCoord = currentMesh->mTextureCoords[0][n]; // does this make sense?
       positions.emplace_back(currentPos.x, currentPos.y, currentPos.z);
-      // normals.emplace_back(currentNormal.x, currentNormal.y, currentNormal.z);
-      // textureCoords.emplace_back(currentTexCoord.x, currentTexCoord.y, 0.0f); // z dimension usually unused
 
       if (currentMesh->HasNormals())
       {
@@ -202,20 +198,8 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
     }
 
     // get triangle indices
-    const std::vector<ui32v3> indexBuffer     = getTriangleIndicesFromAiMesh(currentMesh);
-    const ui32                numIndices = 3 * static_cast<ui32>(indexBuffer.size()); // mul by 3, because of vec3
-    const auto                nMeshes         = inputScene->mMeshes;
-    (void)nMeshes;
-
-    // log data
-    if (i == 0)
-    {
-      std::cout << "-----------Vertex Buffer--------------" << std::endl;
-      for (const auto& p : positions)
-      {
-        std::cout << glm::to_string(p) << "\n";
-      }
-    }
+    const std::vector<ui32v3> indexBuffer = getTriangleIndicesFromAiMesh(currentMesh);
+    const ui32                numIndices  = 3 * static_cast<ui32>(indexBuffer.size()); // mul by 3, because of vec3
 
     std::cout << "NumVertices: " << numVertices << std::endl;
     std::cout << "NumIndices: " << numIndices << std::endl;
@@ -232,34 +216,36 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
 ui32 SceneGraphFactory::createNodes(aiScene const* const inputScene, Scene& outputScene, aiNode const* const startNode)
 {
   (void)inputScene;
-  (void)outputScene;
-  (void)startNode;
-  // Assignment 4
 
-  // auto preTraversal = [&](Scene::Node* node, int& depth) -> bool
-  //{
-  //   ++depth;
-  //   //maxDepth = std::max(maxDepth, depth);
-  //   return true; // Continue traversal
-  // };
+  Scene::Node rootNode;
+  f32m4       accumulatedTransformation = glm::identity<f32m4>();
+  outputScene.m_nodes.emplace_back(rootNode);
+  rootNode.traverse(startNode, accumulatedTransformation, outputScene);
 
-  //// recursively fill outputScene.m_nodes and set node member
-  // Scene::Node rootNode = Scene::Node();
-  ////rootNode.traverse();
-
-  return 0;
+  return (ui32)outputScene.m_nodes.size();
 }
 
-void SceneGraphFactory::computeSceneAABB(Scene& scene, AABB& aabb, ui32 nodeIdx, f32m4 transformation)
+void SceneGraphFactory::computeSceneAABB(Scene& scene, AABB& accuAABB, ui32 nodeIdx, f32m4 transformation)
 {
-  (void)transformation;
-  (void)scene;
-  (void)aabb;
   if (nodeIdx >= scene.getNumberOfNodes())
   {
+    scene.m_aabb = accuAABB;
     return;
   }
-  // Assignment 5
+  // get current node
+  const auto currentNode = scene.m_nodes[nodeIdx];
+
+  // update transformation
+  transformation = currentNode.transformation * transformation;
+
+  // merge aabb for each mesh
+  for (const auto& meshIndex : currentNode.meshIndices)
+  {
+    const auto transformedMeshAABB = scene.m_meshes[meshIndex].getAABB().getTransformed(transformation);
+    accuAABB                       = accuAABB.getUnion(transformedMeshAABB);
+  }
+
+  computeSceneAABB(scene, accuAABB, ++nodeIdx, transformation);
 }
 
 void SceneGraphFactory::createTextures(

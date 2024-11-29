@@ -58,9 +58,8 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
 
 #pragma region Index Buffer
 
-  ui64              reserveSize = static_cast<gims::ui64>(nIndices);
   std::vector<ui32> indexBufferCPU;
-  indexBufferCPU.reserve(reserveSize);
+  indexBufferCPU.reserve(nIndices);
   for (ui32 i = 0; i < nIndices; i++)
   {
     indexBufferCPU.emplace_back(indexBuffer[i].x);

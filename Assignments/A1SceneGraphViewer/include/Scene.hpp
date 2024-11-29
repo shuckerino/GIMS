@@ -2,8 +2,10 @@
 #include "TriangleMeshD3D12.hpp"
 #include <ConstantBufferD3D12.hpp>
 #include <Texture2DD3D12.hpp>
+#include <assimp/scene.h>
 #include <d3d12.h>
 #include <gimslib/types.hpp>
+#include <iostream>
 #include <vector>
 
 namespace gims
@@ -24,21 +26,48 @@ public:
   {
     f32m4             transformation; //! Transformation to parent node.
     std::vector<ui32> meshIndices;    //! Index in the array of meshIndices, i.e., Scene::m_meshes[].
-    std::vector<ui32> childIndices;   //! Index in the arroy of nodes, i.e.,Scene::m_nodes[].
+    std::vector<ui32> childIndices;   //! Index in the array of nodes, i.e.,Scene::m_nodes[].
 
-    template<typename PreTraversFunction, typename PostTraversFunction, typename... Targs>
-    void traverse(PreTraversFunction preTravers, PostTraversFunction postTravers, Targs... Fargs)
+    void traverse(const aiNode* assimpNode, f32m4& accuTransformation, Scene& outputScene)
     {
-      const auto continueTraversal = preTravers(this, Fargs...);
-      if (!continueTraversal)
+      std::cout << assimpNode->mName.C_Str() << " traversed!" << std::endl;
+      // set transformation to parent
+      const auto assimpTransformation = assimpNode->mTransformation;
+      f32m4      convertedAssimpTrafo =
+          f32m4(assimpTransformation.a1, assimpTransformation.a2, assimpTransformation.a3, assimpTransformation.a4,
+                assimpTransformation.b1, assimpTransformation.b2, assimpTransformation.b3, assimpTransformation.b4,
+                assimpTransformation.c1, assimpTransformation.c2, assimpTransformation.c3, assimpTransformation.c4,
+                assimpTransformation.d1, assimpTransformation.d2, assimpTransformation.d3, assimpTransformation.d4);
+
+      this->transformation = accuTransformation * convertedAssimpTrafo;
+
+      // add mesh indices for this node
+      for (ui32 i = 0; i < assimpNode->mNumMeshes; i++)
       {
-        return;
+        this->meshIndices.emplace_back(assimpNode->mMeshes[i]);
       }
-      for (const auto& cIter : this->childIndices)
+
+      this->childIndices.reserve(assimpNode->mNumChildren);
+      // traverse children
+      for (ui32 i = 0; i < assimpNode->mNumChildren; i++)
       {
-        cIter->traverse(preTravers, postTravers, Fargs...);
+        outputScene.m_nodes.emplace_back();
+        Scene::Node& childNode = outputScene.m_nodes.back(); // get reference to created node
+
+        // **Debugging:**
+        std::cout << "Adding child node: " << i << std::endl;
+        std::cout << "  m_nodes.size(): " << outputScene.m_nodes.size() << std::endl;
+
+        if (this == nullptr)
+        {
+          std::cout << "Current node is null!" << std::endl;
+        }
+
+        //const auto currentChildIndex = static_cast<ui32>(outputScene.m_nodes.size() - 1);
+        childNode.traverse(assimpNode->mChildren[i], accuTransformation, outputScene);
+        //this->childIndices.emplace_back(currentChildIndex);
+        //std::cout << "  childIndices.size(): " << this->childIndices.size() << std::endl;
       }
-      postTravers(this, Fargs...);
     }
   };
 

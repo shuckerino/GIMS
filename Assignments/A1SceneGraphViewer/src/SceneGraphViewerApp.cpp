@@ -197,7 +197,7 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
 
   // Assignment 2: Uncomment after successful implementation.
   const auto cameraMatrix = m_examinerController.getTransformationMatrix();
-  const auto mv           = cameraMatrix * modelMatrix;
+  const f32m4 mv           = cameraMatrix * modelMatrix;
   //std::cout << "Mv is " << glm::to_string(mv) << std::endl;
   updatePerMeshConstantBuffer(mv);
   updateSceneConstantBuffer();
