@@ -20,7 +20,6 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
   m_examinerController.setTranslationVector(f32v3(0, -0.25f, 1.5));
   createRootSignature();
   createSceneConstantBuffer();
-  createPerMeshConstantBuffer();
   createPipeline();
 }
 
@@ -28,73 +27,9 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
 
 void SceneGraphViewerApp::createRootSignature()
 {
-  //// Descriptor Range für Constant Buffers b1, b2
-  // D3D12_DESCRIPTOR_RANGE descriptorRangeCBV            = {};
-  // descriptorRangeCBV.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-  // descriptorRangeCBV.NumDescriptors                    = 2; // Zwei Constant Buffers
-  // descriptorRangeCBV.BaseShaderRegister                = 1; // b1
-  // descriptorRangeCBV.RegisterSpace                     = 0;
-  // descriptorRangeCBV.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-  //// Descriptor Range für Texturen (t0 bis t4)
-  // D3D12_DESCRIPTOR_RANGE descriptorRangeSRV            = {};
-  // descriptorRangeSRV.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-  // descriptorRangeSRV.NumDescriptors                    = 5; // Fünf Texturen
-  // descriptorRangeSRV.BaseShaderRegister                = 0; // t0
-  // descriptorRangeSRV.RegisterSpace                     = 0;
-  // descriptorRangeSRV.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-  //// Root Parameter für Constant Buffers
-  // D3D12_ROOT_PARAMETER rootParameters[3] = {};
-
-  //// First parameter needs to be Scene constant buffer because of draw call
-  // rootParameters[0].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
-  // rootParameters[0].Descriptor.ShaderRegister = 0; // b0
-  // rootParameters[0].Descriptor.RegisterSpace  = 0;
-  // rootParameters[0].ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
-
-  //// Other two constant Buffers (Descriptor Table)
-  // rootParameters[1].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-  // rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
-  // rootParameters[1].DescriptorTable.pDescriptorRanges   = &descriptorRangeCBV;
-  // rootParameters[1].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
-
-  //// Texturen (Descriptor Table)
-  // rootParameters[2].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-  // rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
-  // rootParameters[2].DescriptorTable.pDescriptorRanges   = &descriptorRangeSRV;
-  // rootParameters[2].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;
-
-  //// Sampler (Descriptor Table)
-  // D3D12_STATIC_SAMPLER_DESC sampler = {};
-  // sampler.Filter                    = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-  // sampler.AddressU                  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-  // sampler.AddressV                  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-  // sampler.AddressW                  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-  // sampler.MipLODBias                = 0;
-  // sampler.MaxAnisotropy             = 1;
-  // sampler.ComparisonFunc            = D3D12_COMPARISON_FUNC_ALWAYS;
-  // sampler.BorderColor               = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-  // sampler.MinLOD                    = 0.0f;
-  // sampler.MaxLOD                    = D3D12_FLOAT32_MAX;
-  // sampler.ShaderRegister            = 0; // s0
-  // sampler.RegisterSpace             = 0;
-  // sampler.ShaderVisibility          = D3D12_SHADER_VISIBILITY_PIXEL;
-
-  //// Root Signature Description
-  // D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-  // rootSignatureDesc.NumParameters             = _countof(rootParameters);
-  // rootSignatureDesc.pParameters               = rootParameters;
-  // rootSignatureDesc.NumStaticSamplers         = 1;
-  // rootSignatureDesc.pStaticSamplers           = &sampler;
-  // rootSignatureDesc.Flags                     = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-
-  // Root Signature Description
-  // D3D12_ROOT_PARAMETER rootParameter = {};
-
   CD3DX12_ROOT_PARAMETER rootParameter[2] = {};
   rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
-  rootParameter[1].InitAsConstantBufferView(1, 0, D3D12_SHADER_VISIBILITY_ALL);
+  rootParameter[1].InitAsConstants(16, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE);
 
   CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
   rootSignatureDesc.Init(2, rootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -191,34 +126,21 @@ void SceneGraphViewerApp::onDrawUI()
 
 void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmdLst)
 {
-  // test assignment 2
-  const auto meshToDraw  = m_scene.getMesh(1);
-  const auto modelMatrix = meshToDraw.getAABB().getNormalizationTransformation();
-
-  // Assignment 2: Uncomment after successful implementation.
-  const auto cameraMatrix = m_examinerController.getTransformationMatrix();
-  const f32m4 mv           = cameraMatrix * modelMatrix;
-  //std::cout << "Mv is " << glm::to_string(mv) << std::endl;
-  updatePerMeshConstantBuffer(mv);
+  const auto  cameraMatrix = m_examinerController.getTransformationMatrix();
   updateSceneConstantBuffer();
-  //  Assignment 6
+
+  //  Assignment 6 (normalize scene)
+  const auto cameraAndNormalization = cameraMatrix * m_scene.getAABB().getNormalizationTransformation();
 
   cmdLst->SetPipelineState(m_pipelineState.Get());
 
-  // Assignment 2: Uncomment after successful implementation.
   cmdLst->SetGraphicsRootSignature(m_rootSignature.Get());
 
-  // set both constant buffers
-  const auto sceneCb = m_sceneconstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
-  const auto meshCb  = m_meshconstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
+  // set constant buffer
+  const auto sceneCb = constantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
   cmdLst->SetGraphicsRootConstantBufferView(0, sceneCb);
-  cmdLst->SetGraphicsRootConstantBufferView(1, meshCb);
 
-  m_scene.addToCommandList(cmdLst, cameraMatrix, 1, 2, 3);
-
-  // try drawing single meshes for Assignment 2
-
-  meshToDraw.addToCommandList(cmdLst);
+  m_scene.addToCommandList(cmdLst, cameraAndNormalization, 1, 2, 3);
 }
 
 #pragma endregion
@@ -232,21 +154,16 @@ struct SceneConstantBuffer
   f32m4 projectionMatrix;
 };
 
-struct PerMeshConstantBuffer
-{
-  f32m4 modelViewMatrix;
-};
-
 } // namespace
 
 void SceneGraphViewerApp::createSceneConstantBuffer()
 {
   const SceneConstantBuffer cb         = {};
   const auto                frameCount = getDX12AppConfig().frameCount;
-  m_sceneconstantBuffers.resize(frameCount);
+  constantBuffers.resize(frameCount);
   for (ui32 i = 0; i < frameCount; i++)
   {
-    m_sceneconstantBuffers[i] = ConstantBufferD3D12(cb, getDevice());
+    constantBuffers[i] = ConstantBufferD3D12(cb, getDevice());
   }
 }
 
@@ -256,25 +173,7 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
   // std::cout << "Projection is " << glm::to_string(cb.projectionMatrix) << std::endl;
-  m_sceneconstantBuffers[getFrameIndex()].upload(&cb);
-}
-
-void SceneGraphViewerApp::createPerMeshConstantBuffer()
-{
-  const PerMeshConstantBuffer cb         = {};
-  const auto                  frameCount = getDX12AppConfig().frameCount;
-  m_meshconstantBuffers.resize(frameCount);
-  for (ui32 i = 0; i < frameCount; i++)
-  {
-    m_meshconstantBuffers[i] = ConstantBufferD3D12(cb, getDevice());
-  }
-}
-
-void SceneGraphViewerApp::updatePerMeshConstantBuffer(const f32m4& modelView)
-{
-  PerMeshConstantBuffer cb;
-  cb.modelViewMatrix = modelView;
-  m_meshconstantBuffers[getFrameIndex()].upload(&cb);
+  constantBuffers[getFrameIndex()].upload(&cb);
 }
 
 #pragma endregion

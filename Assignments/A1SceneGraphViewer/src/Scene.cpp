@@ -6,22 +6,45 @@ using namespace gims;
 
 namespace
 {
-void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 transformation,
+void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuTransformation,
                           const ComPtr<ID3D12GraphicsCommandList>& commandList, ui32 modelViewRootParameterIdx,
                           ui32 materialConstantsRootParameterIdx, ui32 srvRootParameterIdx)
 {
   (void)scene;
   (void)nodeIdx;
-  (void)transformation;
+  (void)accuTransformation;
   (void)commandList;
   (void)modelViewRootParameterIdx;
   (void)materialConstantsRootParameterIdx;
   (void)srvRootParameterIdx;
-  // Assignemt 6
-  // Assignment 10
+  // Assignment 6
+
+  const auto& currentNode = scene.getNode(nodeIdx);
+  // update transformation
+  accuTransformation = accuTransformation * currentNode.transformation;
+
+  // draw meshes
+  for (ui32 m = 0; m < (ui32)currentNode.meshIndices.size(); m++)
+  {
+    commandList->SetGraphicsRoot32BitConstants(1, 16, &accuTransformation, 0);
+    // draw call
+    scene.getMesh(currentNode.meshIndices[m]).addToCommandList(commandList);
+  }
+
+  for (ui32 c = 0; c < (ui32)currentNode.childIndices.size(); c++)
+  {
+    addToCommandListImpl(scene, currentNode.childIndices[c], accuTransformation, commandList, modelViewRootParameterIdx,
+                         materialConstantsRootParameterIdx, srvRootParameterIdx);
+  }
+
+  // normalize scene
+  if (nodeIdx == 0)
+  {
+  }
+
+  // TODO: Assignment 10
 }
 } // namespace
-
 namespace gims
 {
 const Scene::Node& Scene::getNode(ui32 nodeIdx) const

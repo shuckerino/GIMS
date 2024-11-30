@@ -49,9 +49,6 @@ private:
   void createSceneConstantBuffer();
   void updateSceneConstantBuffer();
 
-  void createPerMeshConstantBuffer();
-  void updatePerMeshConstantBuffer(const f32m4& modelView);
-
   struct UiData
   {
     f32v3 m_backgroundColor = f32v3(0.25f, 0.25f, 0.25f);
@@ -59,8 +56,7 @@ private:
 
   ComPtr<ID3D12PipelineState>      m_pipelineState;
   ComPtr<ID3D12RootSignature>      m_rootSignature;
-  std::vector<ConstantBufferD3D12> m_sceneconstantBuffers;
-  std::vector<ConstantBufferD3D12> m_meshconstantBuffers;
+  std::vector<ConstantBufferD3D12> constantBuffers;
   gims::ExaminerController         m_examinerController;
   Scene                            m_scene;
   UiData                           m_uiData;
