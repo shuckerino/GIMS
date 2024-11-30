@@ -31,9 +31,8 @@ f32m4 AABB::getNormalizationTransformation() const
   // Translate center
   const f32v3 center           = diagonalDistance / 2;
   const f32m4 translation = glm::translate(f32m4(1.0f), -center);
-  (void)translation;
 
-  return scale;
+  return scale * translation;
 }
 AABB AABB::getUnion(const AABB& other) const
 {
