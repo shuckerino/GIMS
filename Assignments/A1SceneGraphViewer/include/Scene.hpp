@@ -34,12 +34,13 @@ public:
       // set transformation to parent
       const auto assimpTransformation = assimpNode->mTransformation;
       f32m4      convertedAssimpTrafo =
-          f32m4(assimpTransformation.a1, assimpTransformation.a2, assimpTransformation.a3, assimpTransformation.a4,
-                assimpTransformation.b1, assimpTransformation.b2, assimpTransformation.b3, assimpTransformation.b4,
-                assimpTransformation.c1, assimpTransformation.c2, assimpTransformation.c3, assimpTransformation.c4,
-                assimpTransformation.d1, assimpTransformation.d2, assimpTransformation.d3, assimpTransformation.d4);
+          f32m4(assimpTransformation.a1, assimpTransformation.b1, assimpTransformation.c1, assimpTransformation.d1,
+                assimpTransformation.a2, assimpTransformation.b2, assimpTransformation.c2, assimpTransformation.d2,
+                assimpTransformation.a3, assimpTransformation.b3, assimpTransformation.c3, assimpTransformation.d3,
+                assimpTransformation.a4, assimpTransformation.b4, assimpTransformation.c4, assimpTransformation.d4);
 
-      this->transformation = accuTransformation * convertedAssimpTrafo;
+      accuTransformation   = accuTransformation * convertedAssimpTrafo;
+      this->transformation = accuTransformation;
 
       // add mesh indices for this node
       for (ui32 i = 0; i < assimpNode->mNumMeshes; i++)
@@ -47,26 +48,16 @@ public:
         this->meshIndices.emplace_back(assimpNode->mMeshes[i]);
       }
 
-      this->childIndices.reserve(assimpNode->mNumChildren);
+      //this->childIndices.reserve(assimpNode->mNumChildren);
       // traverse children
       for (ui32 i = 0; i < assimpNode->mNumChildren; i++)
       {
         outputScene.m_nodes.emplace_back();
         Scene::Node& childNode = outputScene.m_nodes.back(); // get reference to created node
 
-        // **Debugging:**
-        std::cout << "Adding child node: " << i << std::endl;
-        std::cout << "  m_nodes.size(): " << outputScene.m_nodes.size() << std::endl;
-
-        if (this == nullptr)
-        {
-          std::cout << "Current node is null!" << std::endl;
-        }
-
-        //const auto currentChildIndex = static_cast<ui32>(outputScene.m_nodes.size() - 1);
+        const auto currentChildIndex = static_cast<ui32>(outputScene.m_nodes.size() - 1);
         childNode.traverse(assimpNode->mChildren[i], accuTransformation, outputScene);
-        //this->childIndices.emplace_back(currentChildIndex);
-        //std::cout << "  childIndices.size(): " << this->childIndices.size() << std::endl;
+        this->childIndices.push_back(currentChildIndex);
       }
     }
   };

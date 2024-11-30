@@ -142,6 +142,8 @@ Scene SceneGraphFactory::createFromAssImpScene(const std::filesystem::path      
 
   createNodes(inputScene, outputScene, inputScene->mRootNode);
 
+  std::cout << outputScene.m_nodes.size() << std::endl;
+
   computeSceneAABB(outputScene, outputScene.m_aabb, 0, glm::identity<f32m4>());
   createTextures(textureFileNameToTextureIndex, absolutePath.parent_path(), device, commandQueue, outputScene);
   createMaterials(inputScene, textureFileNameToTextureIndex, device, outputScene);
@@ -216,36 +218,38 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
 ui32 SceneGraphFactory::createNodes(aiScene const* const inputScene, Scene& outputScene, aiNode const* const startNode)
 {
   (void)inputScene;
-
-  Scene::Node rootNode;
+  outputScene.m_nodes.reserve(
+      101); // necessary, otherwise exception in childIndices, TODO: make it generic for arbitrary scenes
+  outputScene.m_nodes.emplace_back();
+  Scene::Node& rootNode                  = outputScene.m_nodes.back();
   f32m4       accumulatedTransformation = glm::identity<f32m4>();
-  outputScene.m_nodes.emplace_back(rootNode);
   rootNode.traverse(startNode, accumulatedTransformation, outputScene);
 
   return (ui32)outputScene.m_nodes.size();
 }
 
-void SceneGraphFactory::computeSceneAABB(Scene& scene, AABB& accuAABB, ui32 nodeIdx, f32m4 transformation)
+void SceneGraphFactory::computeSceneAABB(Scene& scene, AABB& accuAABB, ui32 nodeIdx, f32m4 accuTransformation)
 {
-  if (nodeIdx >= scene.getNumberOfNodes())
-  {
-    scene.m_aabb = accuAABB;
-    return;
-  }
   // get current node
   const auto currentNode = scene.m_nodes[nodeIdx];
 
   // update transformation
-  transformation = currentNode.transformation * transformation;
+  accuTransformation = accuTransformation * currentNode.transformation;
 
   // merge aabb for each mesh
   for (const auto& meshIndex : currentNode.meshIndices)
   {
-    const auto transformedMeshAABB = scene.m_meshes[meshIndex].getAABB().getTransformed(transformation);
+    const auto transformedMeshAABB = scene.m_meshes[meshIndex].getAABB().getTransformed(accuTransformation);
     accuAABB                       = accuAABB.getUnion(transformedMeshAABB);
   }
-
-  computeSceneAABB(scene, accuAABB, ++nodeIdx, transformation);
+  for (ui32 i = 0; i < (ui32)currentNode.childIndices.size(); i++)
+  {
+    computeSceneAABB(scene, accuAABB, currentNode.childIndices[i], accuTransformation);
+  }
+  if (nodeIdx == 0)
+  {
+    scene.m_aabb = accuAABB; // set after traversal is done
+  }
 }
 
 void SceneGraphFactory::createTextures(

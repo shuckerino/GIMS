@@ -60,7 +60,7 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
 
   std::vector<ui32> indexBufferCPU;
   indexBufferCPU.reserve(nIndices);
-  for (ui32 i = 0; i < nIndices; i++)
+  for (ui32 i = 0; i < ui32(nIndices / 3); i++) // need to divide by 3, because we iterate over vec3
   {
     indexBufferCPU.emplace_back(indexBuffer[i].x);
     indexBufferCPU.emplace_back(indexBuffer[i].y);
