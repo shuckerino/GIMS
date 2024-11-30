@@ -215,23 +215,41 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
   }
 }
 
-ui32 SceneGraphFactory::createNodes(aiScene const* const inputScene, Scene& outputScene, aiNode const* const startNode)
+ui32 SceneGraphFactory::createNodes(aiScene const* const inputScene, Scene& outputScene, aiNode const* const assimpNode)
 {
   (void)inputScene;
-  outputScene.m_nodes.reserve(
-      101); // necessary, otherwise exception in childIndices, TODO: make it generic for arbitrary scenes
-  outputScene.m_nodes.emplace_back();
-  Scene::Node& rootNode                  = outputScene.m_nodes.back();
-  f32m4       accumulatedTransformation = glm::identity<f32m4>();
-  rootNode.traverse(startNode, accumulatedTransformation, outputScene);
 
-  return (ui32)outputScene.m_nodes.size();
+  // create node and add to list
+  outputScene.m_nodes.emplace_back();
+  const auto   currentNodeIndex = static_cast<ui32>(outputScene.m_nodes.size() - 1);
+  Scene::Node& currentNode      = outputScene.m_nodes.back();
+
+  // set transformation to parent
+  const aiMatrix4x4 parentRelativeTransformation = assimpNode->mTransformation;
+  glm::mat4         convertedAssimpTrafo         = aiMatrix4x4ToGlm(parentRelativeTransformation);
+  currentNode.transformation                     = convertedAssimpTrafo;
+
+  // set mesh indices
+  for (ui32 i = 0; i < assimpNode->mNumMeshes; i++)
+  {
+    currentNode.meshIndices.push_back(assimpNode->mMeshes[i]);
+  }
+
+  // traverse children
+  aiNode** childrenOfInputNode = assimpNode->mChildren;
+  for (ui32 i = 0; i < assimpNode->mNumChildren; i++)
+  {
+    const ui32 childNodeIndex = createNodes(inputScene, outputScene, childrenOfInputNode[i]);
+    outputScene.m_nodes.at(currentNodeIndex).childIndices.emplace_back(childNodeIndex);
+  }
+
+  return currentNodeIndex;
 }
 
 void SceneGraphFactory::computeSceneAABB(Scene& scene, AABB& accuAABB, ui32 nodeIdx, f32m4 accuTransformation)
 {
   // get current node
-  const auto currentNode = scene.m_nodes[nodeIdx];
+  const auto currentNode = scene.getNode(nodeIdx);
 
   // update transformation
   accuTransformation = accuTransformation * currentNode.transformation;
@@ -245,10 +263,6 @@ void SceneGraphFactory::computeSceneAABB(Scene& scene, AABB& accuAABB, ui32 node
   for (ui32 i = 0; i < (ui32)currentNode.childIndices.size(); i++)
   {
     computeSceneAABB(scene, accuAABB, currentNode.childIndices[i], accuTransformation);
-  }
-  if (nodeIdx == 0)
-  {
-    scene.m_aabb = accuAABB; // set after traversal is done
   }
 }
 

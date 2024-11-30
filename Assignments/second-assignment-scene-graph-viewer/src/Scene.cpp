@@ -6,45 +6,40 @@ using namespace gims;
 
 namespace
 {
-void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuTransformation,
+void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 transformation,
                           const ComPtr<ID3D12GraphicsCommandList>& commandList, ui32 modelViewRootParameterIdx,
                           ui32 materialConstantsRootParameterIdx, ui32 srvRootParameterIdx)
 {
-  (void)scene;
-  (void)nodeIdx;
-  (void)accuTransformation;
-  (void)commandList;
-  (void)modelViewRootParameterIdx;
-  (void)materialConstantsRootParameterIdx;
-  (void)srvRootParameterIdx;
-  // Assignment 6
 
   if (nodeIdx >= scene.getNumberOfNodes())
   {
     return;
   }
 
-  const auto& currentNode = scene.getNode(nodeIdx);
-  // update transformation
-  accuTransformation = accuTransformation * currentNode.transformation;
+  Scene::Node currentNode               = scene.getNode(nodeIdx);
+  f32m4       accumulatedTransformation =
+      transformation * currentNode.transformation;
 
-  // draw meshes
-  for (ui32 m = 0; m < (ui32)currentNode.meshIndices.size(); m++)
+  for (ui32 i = 0; i < currentNode.meshIndices.size(); i++)
   {
-    commandList->SetGraphicsRoot32BitConstants(modelViewRootParameterIdx, 16, &accuTransformation, 0);
-    // draw call
-    scene.getMesh(currentNode.meshIndices[m]).addToCommandList(commandList);
+    commandList->SetGraphicsRoot32BitConstants(modelViewRootParameterIdx, 16, &accumulatedTransformation, 0);
+    scene.getMesh(currentNode.meshIndices[i]).addToCommandList(commandList);
   }
 
-  for (ui32 c = 0; c < (ui32)currentNode.childIndices.size(); c++)
+  for (const ui32& nodeIndex : currentNode.childIndices)
   {
-    addToCommandListImpl(scene, currentNode.childIndices[c], accuTransformation, commandList, modelViewRootParameterIdx,
+    addToCommandListImpl(scene, nodeIndex, accumulatedTransformation, commandList, modelViewRootParameterIdx,
                          materialConstantsRootParameterIdx, srvRootParameterIdx);
   }
 
-  // TODO: Assignment 10
+  
+  (void)materialConstantsRootParameterIdx;
+  (void)srvRootParameterIdx;
+  // Assignemt 6
+  // Assignment 10
 }
 } // namespace
+
 namespace gims
 {
 const Scene::Node& Scene::getNode(ui32 nodeIdx) const

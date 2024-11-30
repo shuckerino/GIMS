@@ -25,11 +25,9 @@ f32m4 AABB::getNormalizationTransformation() const
   const f32   maxDimension     = glm::max(glm::max(diagonalDistance.x, diagonalDistance.y), diagonalDistance.z);
   const f32   scalingFactor    = 1.0f / maxDimension;
   const f32m4 scale            = glm::scale(f32m4(1.0f), f32v3(scalingFactor));
-  (void)scalingFactor;
-  //const f32m4 scale            = glm::scale(f32m4(1.0f), f32v3(1.0f)); // debug
 
   // Translate center
-  const f32v3 center           = diagonalDistance / 2;
+  const f32v3 center      = (m_upperRightTop + m_lowerLeftBottom) / 2.0f;
   const f32m4 translation = glm::translate(f32m4(1.0f), -center);
 
   return scale * translation;
@@ -38,12 +36,15 @@ AABB AABB::getUnion(const AABB& other) const
 {
   // To calculate the union of two bounding boxes, we need to do the following...
   // Make new AABB with min of lower left corners and max of top right corners
-  const auto minLowerLeft   = glm::min(this->m_lowerLeftBottom, other.m_lowerLeftBottom);
-  const auto maxUpperRight  = glm::max(this->m_upperRightTop, other.m_upperRightTop);
-  auto       newAABB        = AABB();
-  newAABB.m_lowerLeftBottom = minLowerLeft;
-  newAABB.m_upperRightTop   = maxUpperRight;
-  return newAABB;
+  AABB unifiedAABB;
+  unifiedAABB.m_lowerLeftBottom = f32v3(std::min(m_lowerLeftBottom.x, other.m_lowerLeftBottom.x),
+                                        std::min(m_lowerLeftBottom.y, other.m_lowerLeftBottom.y),
+                                        std::min(m_lowerLeftBottom.z, other.m_lowerLeftBottom.z));
+  unifiedAABB.m_upperRightTop =
+      f32v3(std::max(m_upperRightTop.x, other.m_upperRightTop.x), std::max(m_upperRightTop.y, other.m_upperRightTop.y),
+            std::max(m_upperRightTop.z, other.m_upperRightTop.z));
+
+  return unifiedAABB;
 }
 const f32v3& AABB::getLowerLeftBottom()
 {
@@ -55,7 +56,7 @@ const f32v3& AABB::getUpperRightTop() const
 }
 AABB AABB::getTransformed(f32m4& transformation) const
 {
-  auto transformedAABB = AABB();
+  auto transformedAABB              = AABB();
   transformedAABB.m_lowerLeftBottom = f32v3(transformation * f32v4(this->m_lowerLeftBottom, 1.0f));
   transformedAABB.m_upperRightTop   = f32v3(transformation * f32v4(this->m_upperRightTop, 1.0f));
   return transformedAABB;

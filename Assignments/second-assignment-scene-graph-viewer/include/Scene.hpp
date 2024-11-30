@@ -2,19 +2,12 @@
 #include "TriangleMeshD3D12.hpp"
 #include <ConstantBufferD3D12.hpp>
 #include <Texture2DD3D12.hpp>
-#include <assimp/scene.h>
 #include <d3d12.h>
 #include <gimslib/types.hpp>
-#include <iostream>
 #include <vector>
 
 namespace gims
 {
-
-static inline glm::mat4 aiMatrix4x4ToGlm(const aiMatrix4x4& from)
-{
-  return glm::transpose(glm::make_mat4(&from.a1));
-}
 
 class SceneGraphFactory;
 
@@ -32,6 +25,8 @@ public:
     f32m4             transformation; //! Transformation to parent node.
     std::vector<ui32> meshIndices;    //! Index in the array of meshIndices, i.e., Scene::m_meshes[].
     std::vector<ui32> childIndices;   //! Index in the array of nodes, i.e.,Scene::m_nodes[].
+
+
   };
 
   /// <summary>
@@ -64,14 +59,14 @@ public:
   const AABB& getAABB() const;
 
   /// <summary>
-  /// Nodes are stored in a flat 1D array. This functions returns the Node at the respective index.
+  /// Nodes are stored in a flat 1D array. This functions returns the Node at the respecitve index.
   /// </summary>
   /// <param name="nodeIdx">Index of the node within the array of nodes.</param>
   /// <returns></returns>
   const Node& getNode(ui32 nodeIdx) const;
 
   /// <summary>
-  /// Nodes are stored in a flat 1D array. This functions returns the Node at the respective index.
+  /// Nodes are stored in a flat 1D array. This functions returns the Node at the respecitve index.
   /// </summary>
   /// <param name="nodeIdx">Index of the node within the array of nodes.</param>
   /// <returns></returns>
@@ -96,7 +91,7 @@ public:
   const Material& getMaterial(ui32 materialIdx) const;
 
   /// <summary>
-  /// Traverse the scene graph and add the draw calls, and all other necessary commands to the command list.
+  /// Traverse the scene graph and add the draw calls, and all other neccessary commands to the command list.
   /// </summary>
   /// <param name="commandList">The command list to which the commands will be added.</param>
   /// <param name="viewMatrix">The view matrix (or camera matrix).</param>
@@ -110,7 +105,7 @@ public:
                         ui32 modelViewRootParameterIdx, ui32 materialConstantsRootParameterIdx,
                         ui32 srvRootParameterIdx);
 
-  // Allow the class SceneGraphFactor access to the private members.
+  // Allow the class SceneGraphFactor access to the privatem mebers.
   friend class SceneGraphFactory;
 
 private:
