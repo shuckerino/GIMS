@@ -27,12 +27,14 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
 
 void SceneGraphViewerApp::createRootSignature()
 {
-  CD3DX12_ROOT_PARAMETER rootParameter[2] = {};
+  CD3DX12_ROOT_PARAMETER rootParameter[3] = {};
   rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
   rootParameter[1].InitAsConstants(16, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE);
+  rootParameter[2].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_PIXEL);
 
   CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-  rootSignatureDesc.Init(2, rootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+  rootSignatureDesc.Init(_countof(rootParameter), rootParameter, 0, nullptr,
+                         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
   ComPtr<ID3DBlob> rootBlob, errorBlob;
   D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
@@ -126,7 +128,7 @@ void SceneGraphViewerApp::onDrawUI()
 
 void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmdLst)
 {
-  const auto  cameraMatrix = m_examinerController.getTransformationMatrix();
+  const auto cameraMatrix = m_examinerController.getTransformationMatrix();
   updateSceneConstantBuffer();
 
   //  Assignment 6 (normalize scene)

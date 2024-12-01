@@ -31,9 +31,13 @@ void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuTransformation,
   // draw meshes
   for (ui32 m = 0; m < (ui32)currentNode.meshIndices.size(); m++)
   {
+    const auto& meshToDraw = scene.getMesh(currentNode.meshIndices[m]);
     commandList->SetGraphicsRoot32BitConstants(modelViewRootParameterIdx, 16, &accuTransformation, 0);
+    commandList->SetGraphicsRootConstantBufferView(
+        2,
+        scene.getMaterial(meshToDraw.getMaterialIndex()).materialConstantBuffer.getResource()->GetGPUVirtualAddress());
     // draw call
-    scene.getMesh(currentNode.meshIndices[m]).addToCommandList(commandList);
+    meshToDraw.addToCommandList(commandList);
   }
 
   for (ui32 c = 0; c < (ui32)currentNode.childIndices.size(); c++)

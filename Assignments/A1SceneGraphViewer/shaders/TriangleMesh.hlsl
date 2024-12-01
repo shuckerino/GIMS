@@ -22,6 +22,17 @@ cbuffer PerMeshConstants : register(b1)
     float4x4 modelViewMatrix;
 }
 
+
+/// <summary>
+/// Constants that are really constant for the entire scene.
+/// </summary>
+cbuffer Material : register(b2)
+{
+    float4 ambientColor;
+    float4 diffuseColor;
+    float4 specularColorAndExponent;
+}
+
 VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, float2 texCoord : TEXCOORD)
 {
     VertexShaderOutput output;
@@ -45,6 +56,6 @@ float4 PS_main(VertexShaderOutput input)
     : SV_TARGET
 {
   //return float4(input.viewSpaceNormal.x, input.texCoord.y, 0.0f, 1.0f);
-  return float4(input.texCoord.x, input.texCoord.y, 0.0f, 1.0f);
-//   return float4(0.2f, 0.8f, 0.8f, 1.0f);
+  //return float4(input.texCoord.x, input.texCoord.y, 0.0f, 1.0f);
+  return float4(diffuseColor.x, diffuseColor.y, diffuseColor.z, 1.0f);
 }

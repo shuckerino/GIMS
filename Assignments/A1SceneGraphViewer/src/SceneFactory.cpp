@@ -283,12 +283,34 @@ void SceneGraphFactory::createMaterials(aiScene const* const                    
                                         std::unordered_map<std::filesystem::path, ui32> textureFileNameToTextureIndex,
                                         const ComPtr<ID3D12Device>& device, Scene& outputScene)
 {
-  (void)inputScene;
-  (void)textureFileNameToTextureIndex;
-  (void)device;
-  (void)outputScene;
-  // Assignment 7
+  // iterate over materials in the scene
+  for (ui32 i = 0; i < inputScene->mNumMaterials; i++)
+  {
+    aiMaterial*                   currentMaterial = inputScene->mMaterials[i];
+    Scene::MaterialConstantBuffer mcb;
+
+    // fill mcb by extracting data from assimp
+    mcb.ambientColor = getColor(AI_MATKEY_COLOR_AMBIENT, currentMaterial);
+    mcb.diffuseColor = getColor(AI_MATKEY_COLOR_DIFFUSE, currentMaterial);
+    ai_real specularExponent;
+    aiGetMaterialFloat(currentMaterial, AI_MATKEY_SHININESS, &specularExponent);
+    f32v4 specularColor          = getColor(AI_MATKEY_COLOR_SPECULAR, currentMaterial);
+    mcb.specularColorAndExponent = f32v4(specularColor.r, specularColor.g, specularColor.b, specularExponent);
+
+    // create constant buffer
+    ConstantBufferD3D12 materialConstantBuffer(mcb, device);
+    // create material and add to scene
+    outputScene.m_materials.emplace_back(materialConstantBuffer);
+
+    // log for debug
+    std::cout << "Created material: " << currentMaterial->GetName().C_Str() << std::endl;
+    std::cout << "Ambient Color: " << glm::to_string(mcb.ambientColor) << std::endl;
+    std::cout << "Diffuse Color: " << glm::to_string(mcb.diffuseColor) << std::endl;
+    std::cout << "Specular Color with exponent: " << glm::to_string(mcb.specularColorAndExponent) << std::endl;
+  }
+
   // Assignment 9
+  (void)textureFileNameToTextureIndex;
   // Assignment 10
 }
 
