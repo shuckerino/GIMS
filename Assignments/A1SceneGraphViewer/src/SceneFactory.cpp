@@ -47,7 +47,7 @@ ui8 getDefaultTextureIndexForTextureType(aiTextureType aiTextureTypeValue)
   if (aiTextureTypeValue == aiTextureType_SPECULAR)
     return 0;
   if (aiTextureTypeValue == aiTextureType_EMISSIVE)
-    return 0;
+    return 1;
   if (aiTextureTypeValue == aiTextureType_HEIGHT)
     return 2;
   return 0;
@@ -288,12 +288,12 @@ void SceneGraphFactory::createTextures(
 {
   outputScene.m_textures.resize(ui32(textureFileNameToTextureIndex.size() + 3));
   // create default textures
-  const auto white = gims::ui8v4(1, 1, 1, 1);
-  const auto black = gims::ui8v4(0, 0, 0, 1);
-  const auto blue  = gims::ui8v4(0, 0, 1, 1);
-  outputScene.m_textures.emplace_back(&white, 1, 1, device, commandQueue); // white
-  outputScene.m_textures.emplace_back(&black, 1, 1, device, commandQueue); // black
-  outputScene.m_textures.emplace_back(&blue, 1, 1, device, commandQueue);  // blue
+  const auto white             = gims::ui8v4(255, 255, 255, 255);
+  const auto black             = gims::ui8v4(0, 0, 0, 255);
+  const auto blue              = gims::ui8v4(0, 0, 255, 255);
+  outputScene.m_textures.at(0) = Texture2DD3D12(&white, 1, 1, device, commandQueue); // white
+  outputScene.m_textures.at(1) = Texture2DD3D12(&black, 1, 1, device, commandQueue); // black
+  outputScene.m_textures.at(2) = Texture2DD3D12(&blue, 1, 1, device, commandQueue);  // blue
 
   // create every texture in "textureFileNameToTextureIndex"
   for (const auto& entry : textureFileNameToTextureIndex)
@@ -315,8 +315,9 @@ void SceneGraphFactory::createMaterials(aiScene const* const                    
     Scene::MaterialConstantBuffer mcb;
 
     // fill mcb by extracting data from assimp
-    mcb.ambientColor = getColor(AI_MATKEY_COLOR_AMBIENT, currentMaterial);
-    mcb.diffuseColor = getColor(AI_MATKEY_COLOR_DIFFUSE, currentMaterial);
+    f32v4 emissiveFactors = getColor(AI_MATKEY_COLOR_EMISSIVE, currentMaterial);
+    mcb.ambientColor      = getColor(AI_MATKEY_COLOR_AMBIENT, currentMaterial) + emissiveFactors;
+    mcb.diffuseColor      = getColor(AI_MATKEY_COLOR_DIFFUSE, currentMaterial);
     ai_real specularExponent;
     aiGetMaterialFloat(currentMaterial, AI_MATKEY_SHININESS, &specularExponent);
     f32v4 specularColor          = getColor(AI_MATKEY_COLOR_SPECULAR, currentMaterial);
@@ -338,6 +339,7 @@ void SceneGraphFactory::createMaterials(aiScene const* const                    
     outputScene.m_materials.emplace_back(materialConstantBuffer, textureDescriptorHeap);
 
     ui8 descriptorIndex = 0;
+
     addTextureToDescriptorHeap(device, aiTextureType_AMBIENT, descriptorIndex++, currentMaterial,
                                outputScene.m_textures, textureDescriptorHeap, textureFileNameToTextureIndex);
     addTextureToDescriptorHeap(device, aiTextureType_DIFFUSE, descriptorIndex++, currentMaterial,

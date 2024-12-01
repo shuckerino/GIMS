@@ -64,10 +64,23 @@ VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, f
 float4 PS_main(VertexShaderOutput input)
     : SV_TARGET
 {
-  //return float4(input.viewSpaceNormal.x, input.texCoord.y, 0.0f, 1.0f);
-  //return float4(input.texCoord.x, input.texCoord.y, 0.0f, 1.0f);
-  //return float4(diffuseColor.x, diffuseColor.y, diffuseColor.z, 1.0f);
-  float3 color0 = g_textureDiffuse.Sample(g_sampler, input.texCoord, 0);
-  return float4(color0.x, color0.y, color0.z, 1.0f);
+    float3 lightDirection = float3(0.0f, 0.0f, -1.0f);
+    float3 l = normalize(lightDirection);
 
+    float3 n = normalize(input.viewSpaceNormal);
+    float3 v = normalize(-input.viewSpacePosition);
+    float3 h = normalize(l + v);
+
+    float f_diffuse = max(0.0f, dot(n, l));
+    float f_specular = pow(max(0.0f, dot(n, h)), specularColorAndExponent.w);
+
+    // calculate each component
+    float4 ambient = g_textureAmbient.Sample(g_sampler, input.texCoord) * ambientColor;
+    float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor * f_diffuse;
+    float4 specular = float4(g_textureSpecular.Sample(g_sampler, input.texCoord) * specularColorAndExponent.xyz * f_specular, 1.0f);
+
+    float4 emissive = g_textureEmissive.Sample(g_sampler, input.texCoord);
+
+    float4 color = ambient + diffuse + specular + emissive;
+    return float4(color.x, color.y, color.z, 1.0f);
 }
