@@ -33,6 +33,15 @@ cbuffer Material : register(b2)
     float4 specularColorAndExponent;
 }
 
+Texture2D<float4> g_textureAmbient : register(t0);
+Texture2D<float4> g_textureDiffuse : register(t1);
+Texture2D<float4> g_textureSpecular : register(t2);
+Texture2D<float4> g_textureEmissive : register(t3);
+Texture2D<float4> g_textureNormal : register(t4);
+
+SamplerState g_sampler : register(s0);
+
+
 VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, float2 texCoord : TEXCOORD)
 {
     VertexShaderOutput output;
@@ -57,5 +66,8 @@ float4 PS_main(VertexShaderOutput input)
 {
   //return float4(input.viewSpaceNormal.x, input.texCoord.y, 0.0f, 1.0f);
   //return float4(input.texCoord.x, input.texCoord.y, 0.0f, 1.0f);
-  return float4(diffuseColor.x, diffuseColor.y, diffuseColor.z, 1.0f);
+  //return float4(diffuseColor.x, diffuseColor.y, diffuseColor.z, 1.0f);
+  float3 color0 = g_textureDiffuse.Sample(g_sampler, input.texCoord, 0);
+  return float4(color0.x, color0.y, color0.z, 1.0f);
+
 }

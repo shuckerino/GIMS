@@ -31,11 +31,15 @@ void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuTransformation,
   // draw meshes
   for (ui32 m = 0; m < (ui32)currentNode.meshIndices.size(); m++)
   {
-    const auto& meshToDraw = scene.getMesh(currentNode.meshIndices[m]);
+    const auto& meshToDraw   = scene.getMesh(currentNode.meshIndices[m]);
+    const auto& meshMaterial = scene.getMaterial(meshToDraw.getMaterialIndex());
     commandList->SetGraphicsRoot32BitConstants(modelViewRootParameterIdx, 16, &accuTransformation, 0);
     commandList->SetGraphicsRootConstantBufferView(
-        2,
-        scene.getMaterial(meshToDraw.getMaterialIndex()).materialConstantBuffer.getResource()->GetGPUVirtualAddress());
+        2, meshMaterial.materialConstantBuffer.getResource()->GetGPUVirtualAddress());
+    
+    commandList->SetDescriptorHeaps(1, meshMaterial.srvDescriptorHeap.GetAddressOf());
+    commandList->SetGraphicsRootDescriptorTable(3, meshMaterial.srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+    
     // draw call
     meshToDraw.addToCommandList(commandList);
   }

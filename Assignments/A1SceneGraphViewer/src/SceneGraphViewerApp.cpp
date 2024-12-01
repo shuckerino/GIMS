@@ -27,13 +27,30 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
 
 void SceneGraphViewerApp::createRootSignature()
 {
-  CD3DX12_ROOT_PARAMETER rootParameter[3] = {};
+  CD3DX12_ROOT_PARAMETER   rootParameter[4] = {};
+  CD3DX12_DESCRIPTOR_RANGE range         = {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0};
   rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
   rootParameter[1].InitAsConstants(16, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE);
   rootParameter[2].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_PIXEL);
+  rootParameter[3].InitAsDescriptorTable(1, &range);
+
+  D3D12_STATIC_SAMPLER_DESC sampler = {};
+  sampler.Filter                    = D3D12_FILTER_MIN_MAG_MIP_POINT;
+  sampler.AddressU                  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+  sampler.AddressV                  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+  sampler.AddressW                  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+  sampler.MipLODBias                = 0;
+  sampler.MaxAnisotropy             = 0;
+  sampler.ComparisonFunc            = D3D12_COMPARISON_FUNC_NEVER;
+  sampler.BorderColor               = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+  sampler.MinLOD                    = 0.0f;
+  sampler.MaxLOD                    = D3D12_FLOAT32_MAX;
+  sampler.ShaderRegister            = 0;
+  sampler.RegisterSpace             = 0;
+  sampler.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
 
   CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-  rootSignatureDesc.Init(_countof(rootParameter), rootParameter, 0, nullptr,
+  rootSignatureDesc.Init(_countof(rootParameter), rootParameter, 1, &sampler,
                          D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
   ComPtr<ID3DBlob> rootBlob, errorBlob;

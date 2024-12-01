@@ -38,21 +38,36 @@ std::vector<ui32v3> getTriangleIndicesFromAiMesh(aiMesh const* const mesh)
   return result;
 }
 
+ui8 getDefaultTextureIndexForTextureType(aiTextureType aiTextureTypeValue)
+{
+  if (aiTextureTypeValue == aiTextureType_AMBIENT)
+    return 1;
+  if (aiTextureTypeValue == aiTextureType_DIFFUSE)
+    return 0;
+  if (aiTextureTypeValue == aiTextureType_SPECULAR)
+    return 0;
+  if (aiTextureTypeValue == aiTextureType_EMISSIVE)
+    return 0;
+  if (aiTextureTypeValue == aiTextureType_HEIGHT)
+    return 2;
+  return 0;
+}
+
 void addTextureToDescriptorHeap(const ComPtr<ID3D12Device>& device, aiTextureType aiTextureTypeValue,
                                 i32 offsetInDescriptors, aiMaterial const* const inputMaterial,
-                                const std::vector<Texture2DD3D12>& m_textures, Scene::Material& material,
-                                std::unordered_map<std::filesystem::path, ui32> textureFileNameToTextureIndex,
-                                ui32                                            defaultTextureIndex)
+                                std::vector<Texture2DD3D12>& m_textures, ComPtr<ID3D12DescriptorHeap> descriptorHeap,
+                                std::unordered_map<std::filesystem::path, ui32> textureFileNameToTextureIndex)
 {
   if (inputMaterial->GetTextureCount(aiTextureTypeValue) == 0)
   {
-    m_textures[defaultTextureIndex].addToDescriptorHeap(device, material.srvDescriptorHeap, offsetInDescriptors);
+    m_textures[getDefaultTextureIndexForTextureType(aiTextureTypeValue)].addToDescriptorHeap(device, descriptorHeap,
+                                                                                             offsetInDescriptors);
   }
   else
   {
     aiString path;
-    inputMaterial->GetTexture((aiTextureType)aiTextureTypeValue, 0, &path);
-    m_textures[textureFileNameToTextureIndex[path.C_Str()]].addToDescriptorHeap(device, material.srvDescriptorHeap,
+    inputMaterial->GetTexture(aiTextureTypeValue, 0, &path);
+    m_textures[textureFileNameToTextureIndex[path.C_Str()]].addToDescriptorHeap(device, descriptorHeap,
                                                                                 offsetInDescriptors);
   }
 }
@@ -249,7 +264,7 @@ ui32 SceneGraphFactory::createNodes(aiScene const* const inputScene, Scene& outp
 void SceneGraphFactory::computeSceneAABB(Scene& scene, AABB& accuAABB, ui32 nodeIdx, f32m4 accuTransformation)
 {
   // get current node
-  const auto currentNode = scene.getNode(nodeIdx);
+  const auto& currentNode = scene.getNode(nodeIdx);
 
   // update transformation
   accuTransformation = accuTransformation * currentNode.transformation;
@@ -271,12 +286,22 @@ void SceneGraphFactory::createTextures(
     std::filesystem::path parentPath, const ComPtr<ID3D12Device>& device,
     const ComPtr<ID3D12CommandQueue>& commandQueue, Scene& outputScene)
 {
-  (void)textureFileNameToTextureIndex;
-  (void)parentPath;
-  (void)device;
-  (void)commandQueue;
-  (void)outputScene;
-  // Assignment 9
+  outputScene.m_textures.resize(ui32(textureFileNameToTextureIndex.size() + 3));
+  // create default textures
+  const auto white = gims::ui8v4(1, 1, 1, 1);
+  const auto black = gims::ui8v4(0, 0, 0, 1);
+  const auto blue  = gims::ui8v4(0, 0, 1, 1);
+  outputScene.m_textures.emplace_back(&white, 1, 1, device, commandQueue); // white
+  outputScene.m_textures.emplace_back(&black, 1, 1, device, commandQueue); // black
+  outputScene.m_textures.emplace_back(&blue, 1, 1, device, commandQueue);  // blue
+
+  // create every texture in "textureFileNameToTextureIndex"
+  for (const auto& entry : textureFileNameToTextureIndex)
+  {
+    const std::filesystem::path pathToFilename = parentPath / entry.first;
+    const Texture2DD3D12        createdTexture(pathToFilename, device, commandQueue);
+    outputScene.m_textures.at(entry.second) = createdTexture;
+  }
 }
 
 void SceneGraphFactory::createMaterials(aiScene const* const                            inputScene,
@@ -299,8 +324,30 @@ void SceneGraphFactory::createMaterials(aiScene const* const                    
 
     // create constant buffer
     ConstantBufferD3D12 materialConstantBuffer(mcb, device);
+
+    // Create descriptor heap for the textures
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+    heapDesc.NumDescriptors             = 5; // 5 descriptors for different texture types
+    heapDesc.Type                       = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    heapDesc.Flags                      = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    ComPtr<ID3D12DescriptorHeap> textureDescriptorHeap;
+    device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&textureDescriptorHeap));
+    CD3DX12_CPU_DESCRIPTOR_HANDLE descriptorHandle(textureDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+
     // create material and add to scene
-    outputScene.m_materials.emplace_back(materialConstantBuffer);
+    outputScene.m_materials.emplace_back(materialConstantBuffer, textureDescriptorHeap);
+
+    ui8 descriptorIndex = 0;
+    addTextureToDescriptorHeap(device, aiTextureType_AMBIENT, descriptorIndex++, currentMaterial,
+                               outputScene.m_textures, textureDescriptorHeap, textureFileNameToTextureIndex);
+    addTextureToDescriptorHeap(device, aiTextureType_DIFFUSE, descriptorIndex++, currentMaterial,
+                               outputScene.m_textures, textureDescriptorHeap, textureFileNameToTextureIndex);
+    addTextureToDescriptorHeap(device, aiTextureType_SPECULAR, descriptorIndex++, currentMaterial,
+                               outputScene.m_textures, textureDescriptorHeap, textureFileNameToTextureIndex);
+    addTextureToDescriptorHeap(device, aiTextureType_EMISSIVE, descriptorIndex++, currentMaterial,
+                               outputScene.m_textures, textureDescriptorHeap, textureFileNameToTextureIndex);
+    addTextureToDescriptorHeap(device, aiTextureType_HEIGHT, descriptorIndex++, currentMaterial, outputScene.m_textures,
+                               textureDescriptorHeap, textureFileNameToTextureIndex);
 
     // log for debug
     std::cout << "Created material: " << currentMaterial->GetName().C_Str() << std::endl;
