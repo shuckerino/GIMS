@@ -142,7 +142,7 @@ Scene SceneGraphFactory::createFromAssImpScene(const std::filesystem::path      
   const auto arguments = aiPostProcessSteps::aiProcess_Triangulate | aiProcess_GenSmoothNormals |
                          aiProcess_GenUVCoords | aiProcess_ConvertToLeftHanded | aiProcess_OptimizeMeshes |
                          aiProcess_RemoveRedundantMaterials | aiProcess_ImproveCacheLocality |
-                         aiProcess_FindInvalidData | aiProcess_FindDegenerates;
+                         aiProcess_FindInvalidData | aiProcess_FindDegenerates | aiProcess_CalcTangentSpace;
 
   Assimp::Importer imp;
   imp.SetPropertyBool(AI_CONFIG_PP_FD_REMOVE, true);
