@@ -18,6 +18,7 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
     , m_scene(SceneGraphFactory::createFromAssImpScene(pathToScene, getDevice(), getCommandQueue()))
 {
   m_examinerController.setTranslationVector(f32v3(0, -0.25f, 1.5));
+  m_uiData.m_useNormalMapping = false;
   createRootSignature();
   createSceneConstantBuffer();
   createPipeline();
@@ -28,7 +29,7 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
 void SceneGraphViewerApp::createRootSignature()
 {
   CD3DX12_ROOT_PARAMETER   rootParameter[4] = {};
-  CD3DX12_DESCRIPTOR_RANGE range         = {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0};
+  CD3DX12_DESCRIPTOR_RANGE range            = {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0};
   rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
   rootParameter[1].InitAsConstants(16, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE);
   rootParameter[2].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_PIXEL);
@@ -140,6 +141,7 @@ void SceneGraphViewerApp::onDrawUI()
   ImGui::End();
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
+  ImGui::Checkbox("Use normal mapping", &m_uiData.m_useNormalMapping);
   ImGui::End();
 }
 
@@ -171,6 +173,7 @@ namespace
 struct SceneConstantBuffer
 {
   f32m4 projectionMatrix;
+  ui8   flags;
 };
 
 } // namespace
@@ -189,6 +192,7 @@ void SceneGraphViewerApp::createSceneConstantBuffer()
 void SceneGraphViewerApp::updateSceneConstantBuffer()
 {
   SceneConstantBuffer cb;
+  cb.flags = m_uiData.m_useNormalMapping & 0x1;
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
   // std::cout << "Projection is " << glm::to_string(cb.projectionMatrix) << std::endl;

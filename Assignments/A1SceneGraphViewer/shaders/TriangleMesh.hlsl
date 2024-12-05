@@ -14,6 +14,7 @@ struct VertexShaderOutput
 cbuffer PerFrameConstants : register(b0)
 {
     float4x4 projectionMatrix;
+    uint1 flags;
 }
 
 /// <summary>
@@ -23,7 +24,6 @@ cbuffer PerMeshConstants : register(b1)
 {
     float4x4 modelViewMatrix;
 }
-
 
 /// <summary>
 /// Constants that are really constant for the entire scene.
@@ -53,37 +53,38 @@ VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, f
     output.viewSpaceNormal = mul(modelViewMatrix, float4(normal, 0.0f)).xyz;
     output.clipSpacePosition = mul(projectionMatrix, p4);
     output.texCoord = texCoord;
+
     output.viewSpaceTangent = mul((float3x3)modelViewMatrix, tangent);
-    output.viewSpaceBitangent = cross(output.viewSpaceNormal, output.viewSpaceTangent); // Assume orthogonal tangent basis
-
-    // Skip all transformations and pass the input position directly to clip space.
-    //output.clipSpacePosition = mul(projectionMatrix, float4(position.x, position.y, 0.5f, 1.0f));
-    //output.viewSpacePosition = position;              // Also pass the raw position as view-space (for debugging consistency).
-    //output.viewSpaceNormal = normal;                  // Pass the normal as-is.
-    //output.texCoord = texCoord;                       // Pass the texture coordinates.
-
+    output.viewSpaceBitangent = cross(output.viewSpaceNormal, output.viewSpaceTangent);
     return output;
 }
 
 float4 PS_main(VertexShaderOutput input)
     : SV_TARGET
 {
+    bool useNormalMapping = (flags & 0x1);
     float3 lightDirection = float3(0.0f, 0.0f, -1.0f);
     float3 l = normalize(lightDirection);
+    float3 n = (0.0f, 0.0f, 0.0f);
+    if (useNormalMapping)
+    {
+        float3 normalMapValue = g_textureNormal.Sample(g_sampler, input.texCoord).xyz * 2.0f - 1.0f; // Map from [0,1] to [-1,1]
 
-    float3 normalMapValue = g_textureNormal.Sample(g_sampler, input.texCoord).xyz * 2.0f - 1.0f; // Map from [0,1] to [-1,1]
+        // Construct Tangent-to-View Space matrix
+        float3x3 TBN = float3x3(
+            normalize(input.viewSpaceTangent),
+            normalize(input.viewSpaceBitangent),
+            normalize(input.viewSpaceNormal)
+        );
 
-    // Construct Tangent-to-View Space matrix
-    float3x3 TBN = float3x3(
-        normalize(input.viewSpaceTangent),
-        normalize(input.viewSpaceBitangent),
-        normalize(input.viewSpaceNormal)
-    );
+        // Transform normal map value from Tangent Space to View Space
+        n = normalize(mul(TBN, normalMapValue));
+    }
+    else
+    {
+        n = normalize(input.viewSpaceNormal);
+    }
 
-    // Transform normal map value from Tangent Space to View Space
-    float3 n = normalize(mul(TBN, normalMapValue));
-
-    //float3 n = normalize(input.viewSpaceNormal);
     float3 v = normalize(-input.viewSpacePosition);
     float3 h = normalize(l + v);
 
@@ -99,4 +100,5 @@ float4 PS_main(VertexShaderOutput input)
 
     float4 color = ambient + diffuse + specular + emissive;
     return float4(color.x, color.y, color.z, 1.0f);
+    //return useNormalMapping ? float4(1, 0, 0, 1) : float4(0, 1, 0, 1);
 }

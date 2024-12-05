@@ -52,6 +52,7 @@ private:
   struct UiData
   {
     f32v3 m_backgroundColor = f32v3(0.25f, 0.25f, 0.25f);
+    bool  m_useNormalMapping;
   };
 
   ComPtr<ID3D12PipelineState>      m_pipelineState;
