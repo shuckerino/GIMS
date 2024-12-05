@@ -9,6 +9,8 @@ struct Vertex
   gims::f32v3 position;
   gims::f32v3 normal;
   gims::f32v2 textureCoordinate;
+
+  gims::f32v3 tangents;
 };
 } // namespace
 
@@ -17,11 +19,13 @@ namespace gims
 const std::vector<D3D12_INPUT_ELEMENT_DESC> TriangleMeshD3D12::m_inputElementDescs = {
     {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
     {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-    {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+    {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+    {"TANGENT", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
 
 TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* const normals,
                                      f32v3 const* const textureCoordinates, ui32 nVertices,
-                                     ui32v3 const* const indexBuffer, ui32 nIndices, ui32 materialIndex,
+                                     ui32v3 const* const indexBuffer, ui32 nIndices, f32v3 const* const tangents,
+                                     ui32 materialIndex,
                                      const ComPtr<ID3D12Device>& device, const ComPtr<ID3D12CommandQueue>& commandQueue)
     : m_nIndices(nIndices)
     , m_vertexBufferSize(static_cast<ui32>(nVertices * sizeof(Vertex)))
@@ -38,7 +42,7 @@ TriangleMeshD3D12::TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* 
   {
      //const auto v = Vertex(positions[i], normals[i], textureCoordinates[i]);
      //vertexBuffer.emplace_back(m_aabb.getNormalizationTransformation() * f32v4(v.position, 1.0f));
-    vertexBuffer.emplace_back(positions[i], normals[i], textureCoordinates[i]);
+    vertexBuffer.emplace_back(positions[i], normals[i], textureCoordinates[i], tangents[i]);
   }
 
   UploadHelper uploadHelperVertexBuffer(device, m_vertexBufferSize);

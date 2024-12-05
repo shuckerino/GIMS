@@ -221,10 +221,30 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
     std::cout << "NumVertices: " << numVertices << std::endl;
     std::cout << "NumIndices: " << numIndices << std::endl;
 
+    std::vector<f32v3> tangents;
+    std::vector<f32v3> bitangents;
+    tangents.reserve(indexBuffer.size());
+
+    // calculations for normal mapping
+    for (const auto& triangleFace : indexBuffer)
+    {
+      f32v3 edge1    = positions[triangleFace[1]] - positions[triangleFace[0]];
+      f32v3 edge2    = positions[triangleFace[2]] - positions[triangleFace[0]];
+      f32v2 deltaUV1 = textureCoords[triangleFace[1]] - textureCoords[triangleFace[0]];
+      f32v2 deltaUV2 = textureCoords[triangleFace[2]] - textureCoords[triangleFace[0]];
+
+      float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+      f32 tangent1_x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+      f32 tangent1_y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+      f32 tangent1_z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+      tangents.emplace_back(tangent1_x, tangent1_y, tangent1_z);
+    }
+
     // create internal mesh
     TriangleMeshD3D12 createdMesh = TriangleMeshD3D12::TriangleMeshD3D12(
         positions.data(), normals.data(), textureCoords.data(), numVertices, indexBuffer.data(), numIndices,
-        currentMesh->mMaterialIndex, device, commandQueue);
+        tangents.data(), currentMesh->mMaterialIndex, device, commandQueue);
 
     outputScene.m_meshes.push_back(createdMesh);
   }

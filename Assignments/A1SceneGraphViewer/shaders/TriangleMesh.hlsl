@@ -3,6 +3,8 @@ struct VertexShaderOutput
     float4 clipSpacePosition : SV_POSITION;
     float3 viewSpacePosition : POSITION;
     float3 viewSpaceNormal : NORMAL;
+    float3 viewSpaceTangent : TANGENT;
+    float3 viewSpaceBitangent : BITANGENT;
     float2 texCoord : TEXCOORD;
 };
 
@@ -42,7 +44,7 @@ Texture2D<float4> g_textureNormal : register(t4);
 SamplerState g_sampler : register(s0);
 
 
-VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, float2 texCoord : TEXCOORD)
+VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, float3 tangent : TANGENT, float2 texCoord : TEXCOORD)
 {
     VertexShaderOutput output;
 
@@ -51,6 +53,8 @@ VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, f
     output.viewSpaceNormal = mul(modelViewMatrix, float4(normal, 0.0f)).xyz;
     output.clipSpacePosition = mul(projectionMatrix, p4);
     output.texCoord = texCoord;
+    output.viewSpaceTangent = mul((float3x3)modelViewMatrix, tangent);
+    output.viewSpaceBitangent = cross(output.viewSpaceNormal, output.viewSpaceTangent); // Assume orthogonal tangent basis
 
     // Skip all transformations and pass the input position directly to clip space.
     //output.clipSpacePosition = mul(projectionMatrix, float4(position.x, position.y, 0.5f, 1.0f));
@@ -67,7 +71,19 @@ float4 PS_main(VertexShaderOutput input)
     float3 lightDirection = float3(0.0f, 0.0f, -1.0f);
     float3 l = normalize(lightDirection);
 
-    float3 n = normalize(input.viewSpaceNormal);
+    float3 normalMapValue = g_textureNormal.Sample(g_sampler, input.texCoord).xyz * 2.0f - 1.0f; // Map from [0,1] to [-1,1]
+
+    // Construct Tangent-to-View Space matrix
+    float3x3 TBN = float3x3(
+        normalize(input.viewSpaceTangent),
+        normalize(input.viewSpaceBitangent),
+        normalize(input.viewSpaceNormal)
+    );
+
+    // Transform normal map value from Tangent Space to View Space
+    float3 n = normalize(mul(TBN, normalMapValue));
+
+    //float3 n = normalize(input.viewSpaceNormal);
     float3 v = normalize(-input.viewSpacePosition);
     float3 h = normalize(l + v);
 

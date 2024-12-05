@@ -29,7 +29,8 @@ public:
   /// <param name="device">Device on which the GPU buffers should be created.</param>
   /// <param name="commandQueue">Command queue used to copy the data from the GPU to the GPU.</param>
   TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* const normals, f32v3 const* const textureCoordinates,
-                    ui32 nVertices, ui32v3 const* const indexBuffer, ui32 nIndices, ui32 materialIndex,
+                    ui32 nVertices, ui32v3 const* const indexBuffer, ui32 nIndices, f32v3 const* const tangents,
+                    ui32 materialIndex,
                     const ComPtr<ID3D12Device>& device, const ComPtr<ID3D12CommandQueue>& commandQueue);
 
   /// <summary>
