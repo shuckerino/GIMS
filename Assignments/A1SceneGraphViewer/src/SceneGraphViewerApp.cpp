@@ -142,6 +142,9 @@ void SceneGraphViewerApp::onDrawUI()
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
   ImGui::Checkbox("Use normal mapping", &m_uiData.m_useNormalMapping);
+  ImGui::SliderFloat("Light x position", &m_uiData.m_lightDirection.x, -4.0f, 4.0f);
+  ImGui::SliderFloat("Light y position", &m_uiData.m_lightDirection.y, -4.0f, 4.0f);
+  ImGui::SliderFloat("Light z position", &m_uiData.m_lightDirection.z, -4.0f, 4.0f);
   ImGui::End();
 }
 
@@ -173,6 +176,7 @@ namespace
 struct SceneConstantBuffer
 {
   f32m4 projectionMatrix;
+  f32v3 lightDirection;
   ui8   flags;
 };
 
@@ -192,6 +196,7 @@ void SceneGraphViewerApp::createSceneConstantBuffer()
 void SceneGraphViewerApp::updateSceneConstantBuffer()
 {
   SceneConstantBuffer cb;
+  cb.lightDirection = m_uiData.m_lightDirection;
   cb.flags = m_uiData.m_useNormalMapping & 0x1;
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
