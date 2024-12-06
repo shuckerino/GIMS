@@ -3,6 +3,7 @@
 #pragma warning(push)
 #pragma warning(disable : 4310)
 #pragma warning(disable : 4701)
+#pragma warning(disable : 4201)
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>

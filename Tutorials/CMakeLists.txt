@@ -58,6 +58,3 @@ set_target_properties (LS01Communication PROPERTIES FOLDER Tutorials)
 
 add_subdirectory(./LS02VertexBuffer)
 set_target_properties (LS02VertexBuffer PROPERTIES FOLDER Tutorials)
-
-add_subdirectory(./T17HelloTriangleRayTracing)
-set_target_properties (T17HelloTriangleRayTracing PROPERTIES FOLDER Tutorials)

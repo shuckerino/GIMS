@@ -1,6 +1,5 @@
 #include <gimslib/d3d/DX12App.hpp>
 #include <gimslib/d3d/DX12Util.hpp>
-#include <gimslib/d3d/HLSLProgram.hpp>
 #include <gimslib/dbg/HrException.hpp>
 #include <gimslib/types.hpp>
 #include <iostream>
@@ -9,7 +8,6 @@ using namespace gims;
 class EllipsisApp : public DX12App
 {
 private:
-  gims::HLSLProgram           m_hlslProgram;
   ComPtr<ID3D12PipelineState> m_pipelineState;
   ComPtr<ID3D12RootSignature> m_rootSignature;
 
@@ -27,13 +25,20 @@ private:
 
   void createPipeline()
   {
-    m_hlslProgram = HLSLProgram(L"../../../Tutorials/T02Triangle/Shaders/Ellipsis.hlsl", "VS_main", "PS_main");
+    
+
+    const auto vertexShader =
+        compileShader(L"../../../Tutorials/T02Triangle/Shaders/Ellipsis.hlsl", L"VS_main", L"vs_6_0");
+
+    const auto pixelShader =
+        compileShader(L"../../../Tutorials/T02Triangle/Shaders/Ellipsis.hlsl", L"PS_main", L"ps_6_0");
+
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {}; // init, so geometry shader etc. is getting initialized with 0
     psoDesc.InputLayout                        = {};
     psoDesc.pRootSignature                     = m_rootSignature.Get();
-    psoDesc.VS                                 = CD3DX12_SHADER_BYTECODE(m_hlslProgram.getVertexShader().Get());
-    psoDesc.PS                                 = CD3DX12_SHADER_BYTECODE(m_hlslProgram.getPixelShader().Get());
+    psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
+    psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
     psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState.DepthEnable      = FALSE; // disable depth testing

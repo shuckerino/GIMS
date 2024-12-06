@@ -5,6 +5,7 @@
 #include <iostream>
 using namespace gims;
 
+
 class BasicFramework : public DX12App
 {
 private:
