@@ -72,14 +72,14 @@ float4 PS_main(VertexShaderOutput input)
     {
         float3 normalMapValue = g_textureNormal.Sample(g_sampler, input.texCoord).xyz * 2.0f - 1.0f; // map from [0,1] to [-1,1]
 
-        // Construct Tangent-to-View Space matrix
+        // construct tangent-to-view space matrix
         float3x3 TBN = float3x3(
             normalize(input.viewSpaceTangent),
             normalize(input.viewSpaceBitangent),
             normalize(input.viewSpaceNormal)
         );
 
-        // Transform normal map value from Tangent Space to View Space
+        // transform normal map value from Tangent Space to View Space
         n = normalize(mul(TBN, normalMapValue));
     }
     else

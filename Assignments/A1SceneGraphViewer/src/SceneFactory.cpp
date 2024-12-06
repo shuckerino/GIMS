@@ -189,8 +189,8 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
     normals.reserve(numVertices);
     std::vector<f32v3> textureCoords;
     textureCoords.reserve(numVertices);
-    //std::vector<f32v3> tangents;
-    //tangents.reserve(numVertices);
+    std::vector<f32v3> tangents;
+    tangents.reserve(numVertices);
     for (ui32 n = 0; n < numVertices; n++)
     {
       const aiVector3D& currentPos = currentMesh->mVertices[n];
@@ -203,7 +203,7 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
       }
       else
       {
-        normals.emplace_back(0.0f, 0.0f, 0.0f); // Default normal if missing
+        normals.emplace_back(0.0f, 0.0f, 0.0f); // default normal if missing
       }
 
       if (currentMesh->HasTextureCoords(0))
@@ -213,18 +213,18 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
       }
       else
       {
-        textureCoords.emplace_back(0.0f, 0.0f, 0.0f); // Default UV if missing
+        textureCoords.emplace_back(0.0f, 0.0f, 0.0f); // default UV if missing
       }
 
-      //if (currentMesh->HasTangentsAndBitangents())
-      //{
-      //  const aiVector3D& currentTangent = currentMesh->mTangents[i];
-      //  tangents.emplace_back(currentTangent.x, currentTangent.y, currentTangent.z);
-      //}
-      //else
-      //{
-      //  tangents.emplace_back(0.0f, 0.0f, 0.0f);
-      //}
+      if (currentMesh->HasTangentsAndBitangents())
+      {
+        const aiVector3D& currentTangent = currentMesh->mTangents[i];
+        tangents.emplace_back(currentTangent.x, currentTangent.y, currentTangent.z);
+      }
+      else
+      {
+        tangents.emplace_back(0.0f, 0.0f, 0.0f);
+      }
     }
 
     // get triangle indices
@@ -234,25 +234,25 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
     std::cout << "NumVertices: " << numVertices << std::endl;
     std::cout << "NumIndices: " << numIndices << std::endl;
 
-    // manual calculation of tangents -> not needed, assimp already provides
-     std::vector<f32v3> tangents;
-     tangents.reserve(indexBuffer.size());
+    //// manual calculation of tangents -> not needed, assimp already provides
+    // std::vector<f32v3> tangents;
+    // tangents.reserve(indexBuffer.size());
 
-    // calculations for normal mapping
-     for (const auto& triangleFace : indexBuffer)
-    {
-       f32v3 edge1    = positions[triangleFace[1]] - positions[triangleFace[0]];
-       f32v3 edge2    = positions[triangleFace[2]] - positions[triangleFace[0]];
-       f32v2 deltaUV1 = textureCoords[triangleFace[1]] - textureCoords[triangleFace[0]];
-       f32v2 deltaUV2 = textureCoords[triangleFace[2]] - textureCoords[triangleFace[0]];
+    //// calculations for normal mapping
+    // for (const auto& triangleFace : indexBuffer)
+    //{
+    //   f32v3 edge1    = positions[triangleFace[1]] - positions[triangleFace[0]];
+    //   f32v3 edge2    = positions[triangleFace[2]] - positions[triangleFace[0]];
+    //   f32v2 deltaUV1 = textureCoords[triangleFace[1]] - textureCoords[triangleFace[0]];
+    //   f32v2 deltaUV2 = textureCoords[triangleFace[2]] - textureCoords[triangleFace[0]];
 
-      float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+    //  float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
 
-      f32 tangent1_x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
-      f32 tangent1_y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
-      f32 tangent1_z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
-      tangents.emplace_back(tangent1_x, tangent1_y, tangent1_z);
-    }
+    //  f32 tangent1_x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+    //  f32 tangent1_y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+    //  f32 tangent1_z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+    //  tangents.emplace_back(tangent1_x, tangent1_y, tangent1_z);
+    //}
 
     // create internal mesh
     TriangleMeshD3D12 createdMesh = TriangleMeshD3D12::TriangleMeshD3D12(

@@ -141,7 +141,7 @@ void SceneGraphViewerApp::onDrawUI()
   ImGui::End();
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
-  ImGui::Checkbox("Use normal mapping", &m_uiData.m_useNormalMapping);
+  ImGui::Checkbox("Use normal mapping (not really working)", &m_uiData.m_useNormalMapping);
   ImGui::SliderFloat("Light x position", &m_uiData.m_lightDirection.x, -4.0f, 4.0f);
   ImGui::SliderFloat("Light y position", &m_uiData.m_lightDirection.y, -4.0f, 4.0f);
   ImGui::SliderFloat("Light z position", &m_uiData.m_lightDirection.z, -4.0f, 4.0f);
