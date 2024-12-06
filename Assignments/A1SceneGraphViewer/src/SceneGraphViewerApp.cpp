@@ -30,10 +30,10 @@ void SceneGraphViewerApp::createRootSignature()
 {
   CD3DX12_ROOT_PARAMETER   rootParameter[4] = {};
   CD3DX12_DESCRIPTOR_RANGE range            = {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0};
-  rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
-  rootParameter[1].InitAsConstants(16, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE);
-  rootParameter[2].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_PIXEL);
-  rootParameter[3].InitAsDescriptorTable(1, &range);
+  rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL); // scene constant buffer
+  rootParameter[1].InitAsConstants(16, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE); // mv matrix
+  rootParameter[2].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_PIXEL); // materials
+  rootParameter[3].InitAsDescriptorTable(1, &range); // textures
 
   D3D12_STATIC_SAMPLER_DESC sampler = {};
   sampler.Filter                    = D3D12_FILTER_MIN_MAG_MIP_POINT;

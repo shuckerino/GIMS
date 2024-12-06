@@ -64,13 +64,13 @@ float4 PS_main(VertexShaderOutput input)
     : SV_TARGET
 {
     bool useNormalMapping = (flags & 0x1);
-    bool isFlatSurface = all(abs(input.viewSpaceNormal - float3(0, 1, 0)) < 0.01f);
+    //bool isFlatSurface = all(abs(input.viewSpaceNormal - float3(0, 1, 0)) < 0.01f);
     //float3 lightDirection = float3(0.0f, 0.0f, -1.0f);
     float3 l = normalize(lightDirection);
     float3 n = (0.0f, 0.0f, 0.0f);
-    if (useNormalMapping && !isFlatSurface)
+    if (useNormalMapping)
     {
-        float3 normalMapValue = g_textureNormal.Sample(g_sampler, input.texCoord).xyz * 2.0f - 1.0f; // Map from [0,1] to [-1,1]
+        float3 normalMapValue = g_textureNormal.Sample(g_sampler, input.texCoord).xyz * 2.0f - 1.0f; // map from [0,1] to [-1,1]
 
         // Construct Tangent-to-View Space matrix
         float3x3 TBN = float3x3(

@@ -10,15 +10,6 @@ void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuTransformation,
                           const ComPtr<ID3D12GraphicsCommandList>& commandList, ui32 modelViewRootParameterIdx,
                           ui32 materialConstantsRootParameterIdx, ui32 srvRootParameterIdx)
 {
-  (void)scene;
-  (void)nodeIdx;
-  (void)accuTransformation;
-  (void)commandList;
-  (void)modelViewRootParameterIdx;
-  (void)materialConstantsRootParameterIdx;
-  (void)srvRootParameterIdx;
-  // Assignment 6
-
   if (nodeIdx >= scene.getNumberOfNodes())
   {
     return;
@@ -49,8 +40,6 @@ void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuTransformation,
     addToCommandListImpl(scene, currentNode.childIndices[c], accuTransformation, commandList, modelViewRootParameterIdx,
                          materialConstantsRootParameterIdx, srvRootParameterIdx);
   }
-
-  // TODO: Assignment 10
 }
 } // namespace
 namespace gims

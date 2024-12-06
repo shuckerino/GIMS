@@ -58,12 +58,13 @@ void addTextureToDescriptorHeap(const ComPtr<ID3D12Device>& device, aiTextureTyp
                                 std::vector<Texture2DD3D12>& m_textures, ComPtr<ID3D12DescriptorHeap> descriptorHeap,
                                 std::unordered_map<std::filesystem::path, ui32> textureFileNameToTextureIndex)
 {
+  // default texture
   if (inputMaterial->GetTextureCount(aiTextureTypeValue) == 0)
   {
     m_textures[getDefaultTextureIndexForTextureType(aiTextureTypeValue)].addToDescriptorHeap(device, descriptorHeap,
                                                                                              offsetInDescriptors);
   }
-  else
+  else // custom texture
   {
     aiString path;
     inputMaterial->GetTexture(aiTextureTypeValue, 0, &path);
@@ -188,6 +189,8 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
     normals.reserve(numVertices);
     std::vector<f32v3> textureCoords;
     textureCoords.reserve(numVertices);
+    //std::vector<f32v3> tangents;
+    //tangents.reserve(numVertices);
     for (ui32 n = 0; n < numVertices; n++)
     {
       const aiVector3D& currentPos = currentMesh->mVertices[n];
@@ -212,6 +215,16 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
       {
         textureCoords.emplace_back(0.0f, 0.0f, 0.0f); // Default UV if missing
       }
+
+      //if (currentMesh->HasTangentsAndBitangents())
+      //{
+      //  const aiVector3D& currentTangent = currentMesh->mTangents[i];
+      //  tangents.emplace_back(currentTangent.x, currentTangent.y, currentTangent.z);
+      //}
+      //else
+      //{
+      //  tangents.emplace_back(0.0f, 0.0f, 0.0f);
+      //}
     }
 
     // get triangle indices
@@ -221,17 +234,17 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
     std::cout << "NumVertices: " << numVertices << std::endl;
     std::cout << "NumIndices: " << numIndices << std::endl;
 
-    std::vector<f32v3> tangents;
-    std::vector<f32v3> bitangents;
-    tangents.reserve(indexBuffer.size());
+    // manual calculation of tangents -> not needed, assimp already provides
+     std::vector<f32v3> tangents;
+     tangents.reserve(indexBuffer.size());
 
     // calculations for normal mapping
-    for (const auto& triangleFace : indexBuffer)
+     for (const auto& triangleFace : indexBuffer)
     {
-      f32v3 edge1    = positions[triangleFace[1]] - positions[triangleFace[0]];
-      f32v3 edge2    = positions[triangleFace[2]] - positions[triangleFace[0]];
-      f32v2 deltaUV1 = textureCoords[triangleFace[1]] - textureCoords[triangleFace[0]];
-      f32v2 deltaUV2 = textureCoords[triangleFace[2]] - textureCoords[triangleFace[0]];
+       f32v3 edge1    = positions[triangleFace[1]] - positions[triangleFace[0]];
+       f32v3 edge2    = positions[triangleFace[2]] - positions[triangleFace[0]];
+       f32v2 deltaUV1 = textureCoords[triangleFace[1]] - textureCoords[triangleFace[0]];
+       f32v2 deltaUV2 = textureCoords[triangleFace[2]] - textureCoords[triangleFace[0]];
 
       float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
 
