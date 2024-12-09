@@ -1,10 +1,13 @@
 #pragma once
+#include "nv_helpers_dx12/TopLevelASGenerator.h"
+#include <dxcapi.h>
 #include <gimslib/d3d/DX12App.hpp>
 #include <gimslib/d3d/DX12Util.hpp>
+#include <gimslib/d3d/UploadHelper.hpp>
 #include <gimslib/dbg/HrException.hpp>
 #include <gimslib/types.hpp>
-#include <gimslib/d3d/UploadHelper.hpp>
 #include <iostream>
+#include <vector>
 
 #define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
 
@@ -23,6 +26,16 @@ public:
     return m_device.Get();
   }
 
+  /// <summary>
+  /// Called whenever a new frame is drawn.
+  /// </summary>
+  virtual void onDraw();
+
+  /// <summary>
+  /// Draw UI onto of rendered result.
+  /// </summary>
+  virtual void onDrawUI();
+
 private:
   // DirectX ray tracing interfaces
   ComPtr<ID3D12Device5>              m_device;
@@ -34,7 +47,7 @@ private:
   ComPtr<ID3D12Resource> m_bottomLevelAS;
 
   // Root signatures
-  ComPtr<ID3D12Resource>      m_globalRootSignature;
+  ComPtr<ID3D12RootSignature> m_globalRootSignature;
   ComPtr<ID3D12RootSignature> m_LocalRootSignature;
 
   // Ray tracing output
@@ -67,8 +80,8 @@ private:
   // Geometry
   ui32                     m_vertexBufferSize; //! Vertex buffer size in bytes.
   ui32                     m_indexBufferSize;  //! Index buffer size in bytes.
-  ComPtr<ID3D12Resource> m_indexBuffer;
-  ComPtr<ID3D12Resource> m_vertexBuffer;
+  ComPtr<ID3D12Resource>   m_indexBuffer;
+  ComPtr<ID3D12Resource>   m_vertexBuffer;
   D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
   D3D12_INDEX_BUFFER_VIEW  m_indexBufferView;
 
@@ -84,12 +97,20 @@ private:
   void createGeometry();
 
   // Acceleration structure functions
-  void createAccelerationStructures();
-  void createBottomLevelAS();
-  void createTopLevelAS();
+  void                           createAccelerationStructures();
+  D3D12_RAYTRACING_GEOMETRY_DESC createGeometryDescription();
 
   // Helper functions
-  void AllocateUAVBuffer(ID3D12Device* device, UINT64 bufferSize, ID3D12Resource** ppResource,
+  void AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppResource,
                          D3D12_RESOURCE_STATES initialResourceState, const wchar_t* resourceName);
+  void AllocateUploadBuffer(void* initData, ui64 dataSize, ID3D12Resource** ppResource,
+                            const wchar_t* resourceName);
   void DoRayTracing();
+
+  struct AccelerationStructureBuffers
+  {
+    ComPtr<ID3D12Resource> pScratch;      // Scratch memory for AS builder
+    ComPtr<ID3D12Resource> pResult;       // Where the AS is
+    ComPtr<ID3D12Resource> pInstanceDesc; // Hold the matrices of the instances
+  };
 };
