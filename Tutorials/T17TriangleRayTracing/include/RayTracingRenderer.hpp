@@ -3,6 +3,7 @@
 #include <gimslib/d3d/DX12Util.hpp>
 #include <gimslib/dbg/HrException.hpp>
 #include <gimslib/types.hpp>
+#include <gimslib/d3d/UploadHelper.hpp>
 #include <iostream>
 
 #define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
@@ -64,26 +65,31 @@ private:
   RayGenConstantBuffer m_rayGenCB;
 
   // Geometry
-  std::vector<Vertex>    m_vertices;
+  ui32                     m_vertexBufferSize; //! Vertex buffer size in bytes.
+  ui32                     m_indexBufferSize;  //! Index buffer size in bytes.
   ComPtr<ID3D12Resource> m_indexBuffer;
   ComPtr<ID3D12Resource> m_vertexBuffer;
+  D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+  D3D12_INDEX_BUFFER_VIEW  m_indexBufferView;
 
   // Init functions
   void createRayTracingResources();
   void createRayTracingInterfaces();
-
-  bool checkForRayTracingSupport();
+  bool rayTracingSupported();
   void createRootSignatures();
   void createRayTracingPipeline();
   void createShaderTables();
 
+  // Geometry functions
+  void createGeometry();
+
   // Acceleration structure functions
   void createAccelerationStructures();
+  void createBottomLevelAS();
+  void createTopLevelAS();
 
   // Helper functions
-  CD3DX12_SHADER_BYTECODE getShaderByteCode(const std::filesystem::path& shaderFile, const wchar_t* entryPoint,
-                                            const wchar_t* targetProfile);
-  void                    AllocateUAVBuffer(ID3D12Device* device, UINT64 bufferSize, ID3D12Resource** ppResource,
-                                            D3D12_RESOURCE_STATES initialResourceState, const wchar_t* resourceName);
+  void AllocateUAVBuffer(ID3D12Device* device, UINT64 bufferSize, ID3D12Resource** ppResource,
+                         D3D12_RESOURCE_STATES initialResourceState, const wchar_t* resourceName);
   void DoRayTracing();
 };
