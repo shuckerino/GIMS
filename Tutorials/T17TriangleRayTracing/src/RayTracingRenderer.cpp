@@ -2,6 +2,12 @@
 
 using namespace gims;
 
+// constant shader names
+const wchar_t* RayTracingRenderer::c_hitGroupName         = L"MyHitGroup";
+const wchar_t* RayTracingRenderer::c_raygenShaderName     = L"MyRaygenShader";
+const wchar_t* RayTracingRenderer::c_closestHitShaderName = L"MyClosestHitShader";
+const wchar_t* RayTracingRenderer::c_missShaderName       = L"MyMissShader";
+
 #pragma region Helper functions
 
 void RayTracingRenderer::AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppResource,
@@ -60,6 +66,12 @@ RayTracingRenderer::RayTracingRenderer(const DX12AppConfig createInfo)
   }
 
   createRayTracingResources();
+
+  ComPtr<ID3D12Debug> debugController;
+  if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+  {
+    debugController->EnableDebugLayer();
+  }
 }
 
 bool RayTracingRenderer::isRayTracingSupported()
@@ -85,7 +97,7 @@ void RayTracingRenderer::createRayTracingResources()
 {
   createRayTracingInterfaces();
   createRootSignatures();
-  //createRayTracingPipeline(); // not working yet
+  createRayTracingPipeline(); // not working yet
 
   createGeometry();
   createDescriptorHeap();
@@ -101,6 +113,8 @@ void RayTracingRenderer::createRayTracingInterfaces()
 {
   throwIfFailed(getDevice()->QueryInterface(IID_PPV_ARGS(&m_device)));
   throwIfFailed(getCommandList()->QueryInterface(IID_PPV_ARGS(&m_dxrCommandList)));
+
+  std::cout << "Created ID3D12Device5 and ID3D12GraphicsCommandList4 interfaces" << std::endl;
 }
 
 /// <summary>
@@ -122,6 +136,8 @@ void RayTracingRenderer::createRootSignatures()
 
     getDevice()->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(),
                                      IID_PPV_ARGS(&m_globalRootSignature));
+
+    std::cout << "Created global root signature" << std::endl;
   }
 
   // Then we create local root signatures for each shader
@@ -134,24 +150,46 @@ void RayTracingRenderer::createRootSignatures()
     D3D12SerializeRootSignature(&localRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
     getDevice()->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(),
                                      IID_PPV_ARGS(&m_LocalRootSignature));
+
+    std::cout << "Created local root signature" << std::endl;
+  }
+}
+
+// Local root signature and shader association
+// This is a root signature that enables a shader to have unique arguments that come from shader tables.
+void RayTracingRenderer::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline)
+{
+  // Hit group and miss shaders in this sample are not using a local root signature and thus one is not associated with
+  // them.
+
+  // Local root signature to be used in a ray gen shader.
+  {
+    auto localRootSignature = raytracingPipeline->CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
+    localRootSignature->SetRootSignature(m_LocalRootSignature.Get());
+    // Shader association
+    auto rootSignatureAssociation =
+        raytracingPipeline->CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
+    rootSignatureAssociation->SetSubobjectToAssociate(*localRootSignature);
+    rootSignatureAssociation->AddExport(L"MyRaygenShader");
   }
 }
 
 void RayTracingRenderer::createRayTracingPipeline()
 {
-  ComPtr<IDxcBlob> shaderBlob;
+  ComPtr<IDxcBlob> rayGenBlob, missBlob, hitBlob;
 
-  shaderBlob =
+  rayGenBlob =
       compileShader(L"../../../Tutorials/T17TriangleRayTracing/Shaders/Triangle.hlsl", L"MyRaygenShader", L"lib_6_3");
-  auto rayGenShaderByteCode = HLSLCompiler::convert(shaderBlob);
+  auto rayGenShaderByteCode = HLSLCompiler::convert(rayGenBlob);
 
-  shaderBlob =
+  missBlob =
       compileShader(L"../../../Tutorials/T17TriangleRayTracing/Shaders/Triangle.hlsl", L"MyMissShader", L"lib_6_3");
-  auto missShaderByteCode = HLSLCompiler::convert(shaderBlob);
+  auto missShaderByteCode = HLSLCompiler::convert(missBlob);
 
-  shaderBlob = compileShader(L"../../../Tutorials/T17TriangleRayTracing/Shaders/Triangle.hlsl", L"MyClosestHitShader",
-                             L"lib_6_3");
-  auto hitShaderByteCode = HLSLCompiler::convert(shaderBlob);
+  hitBlob = compileShader(L"../../../Tutorials/T17TriangleRayTracing/Shaders/Triangle.hlsl", L"MyClosestHitShader",
+                          L"lib_6_3");
+
+  auto hitShaderByteCode = HLSLCompiler::convert(hitBlob);
 
   CD3DX12_STATE_OBJECT_DESC raytracingPipeline {D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE};
 
@@ -170,17 +208,37 @@ void RayTracingRenderer::createRayTracingPipeline()
   hitLibrary->SetDXILLibrary(&hitShaderByteCode);
   hitLibrary->DefineExport(L"MyClosestHitShader");
 
+  // Triangle hit group
+  // A hit group specifies closest hit, any hit and intersection shaders to be executed when a ray intersects the
+  // geometry's triangle/AABB. In this sample, we only use triangle geometry with a closest hit shader, so others are
+  // not set.
+  auto hitGroup = raytracingPipeline.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+  hitGroup->SetClosestHitShaderImport(L"MyClosestHitShader");
+  hitGroup->SetHitGroupExport(L"MyHitGroup");
+  hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+
   // Define Shader Config
   auto shaderConfig  = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-  UINT payloadSize   = 1 * sizeof(float); // float rayHitT
+  UINT payloadSize   = 4 * sizeof(float); // float4 for color
   UINT attributeSize = 2 * sizeof(float); // float2 barycentrics
   shaderConfig->Config(payloadSize, attributeSize);
+
+  // Local root signature and shader association
+  CreateLocalRootSignatureSubobjects(&raytracingPipeline);
+  // This is a root signature that enables a shader to have unique arguments that come from shader tables.
+
+  // Global root signature
+  // This is a root signature that is shared across all raytracing shaders invoked during a DispatchRays() call.
+  auto globalRootSignature = raytracingPipeline.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+  globalRootSignature->SetRootSignature(m_globalRootSignature.Get());
 
   auto pipelineConfigSubobject = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
   UINT maxRecursionDepth       = 1; // primary rays only.
   pipelineConfigSubobject->Config(maxRecursionDepth);
 
   throwIfFailed(getRTDevice()->CreateStateObject(raytracingPipeline, IID_PPV_ARGS(&m_dxrStateObject)));
+
+  std::cout << "Created ray tracing pipeline" << std::endl;
 
 #pragma region Old way of creating pipeline
 
@@ -263,9 +321,9 @@ void RayTracingRenderer::createShaderTables()
 
   auto GetShaderIdentifiers = [&](auto* stateObjectProperties)
   {
-    rayGenShaderIdentifier   = stateObjectProperties->GetShaderIdentifier(L"MyRaygenShader");
-    missShaderIdentifier     = stateObjectProperties->GetShaderIdentifier(L"MyMissShader");
-    hitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(L"MyClosestHitShader");
+    rayGenShaderIdentifier   = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
+    missShaderIdentifier     = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
+    hitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_hitGroupName);
   };
 
   // Get shader identifiers.
@@ -508,16 +566,9 @@ void RayTracingRenderer::createOutputResource()
   resourceDesc.MipLevels           = 1;
   resourceDesc.SampleDesc.Count    = 1;
 
-  D3D12_CLEAR_VALUE clearValue = {};
-  clearValue.Format            = DXGI_FORMAT_R8G8B8A8_UNORM;
-  clearValue.Color[0]          = 0.0f;
-  clearValue.Color[1]          = 0.0f;
-  clearValue.Color[2]          = 0.0f;
-  clearValue.Color[3]          = 1.0f;
-
   const auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-  device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_COPY_SOURCE, &clearValue,
-                                  IID_PPV_ARGS(&m_raytracingOutput));
+  device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc,
+                                  D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&m_raytracingOutput));
   NAME_D3D12_OBJECT(m_raytracingOutput);
 
   D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -534,6 +585,8 @@ void RayTracingRenderer::createOutputResource()
 
 void RayTracingRenderer::onDraw()
 {
+  DoRayTracing();
+  CopyRaytracingOutputToBackbuffer();
 }
 
 void RayTracingRenderer::onDrawUI()
@@ -542,7 +595,11 @@ void RayTracingRenderer::onDrawUI()
 
 void RayTracingRenderer::DoRayTracing()
 {
-  auto commandList = getCommandList();
+  auto commandList      = getCommandList();
+  auto commandAllocator = getCommandAllocator(); // Retrieve the command allocator
+
+  // Reset the command allocator and the command list
+  throwIfFailed(m_dxrCommandList->Reset(commandAllocator.Get(), nullptr));
 
   auto DispatchRays = [&](auto* commandList, auto* stateObject, auto* dispatchDesc)
   {
@@ -570,6 +627,41 @@ void RayTracingRenderer::DoRayTracing()
   commandList->SetComputeRootDescriptorTable(0, m_raytracingOutputResourceUAVGpuDescriptor);
   commandList->SetComputeRootShaderResourceView(1, m_topLevelAS->GetGPUVirtualAddress());
   DispatchRays(m_dxrCommandList.Get(), m_dxrStateObject.Get(), &dispatchDesc);
+}
+
+// Copy the raytracing output to the backbuffer.
+void RayTracingRenderer::CopyRaytracingOutputToBackbuffer()
+{
+  auto commandList  = getCommandList();
+  auto renderTarget = getRenderTarget().Get();
+
+  D3D12_RESOURCE_BARRIER preCopyBarriers[1];
+
+  // render target is copy destination
+  preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET,
+                                                            D3D12_RESOURCE_STATE_COPY_DEST);
+
+  // uav is copy source
+  /*preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
+      m_raytracingOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);*/
+  commandList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
+
+  commandList->CopyResource(renderTarget, m_raytracingOutput.Get());
+
+  D3D12_RESOURCE_BARRIER postCopyBarriers[1];
+  postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_COPY_DEST,
+                                                             D3D12_RESOURCE_STATE_RENDER_TARGET);
+  // postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get(),
+  // D3D12_RESOURCE_STATE_COPY_SOURCE,
+  //                                                            D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+  commandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
+
+  //// Transition render target to RENDER_TARGET state from PRESENT
+  // const auto toRenderTarget = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget,
+  // D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+  //                                                                  D3D12_RESOURCE_STATE_RENDER_TARGET);
+  // commandList->ResourceBarrier(1, &toRenderTarget);
 }
 
 #pragma endregion

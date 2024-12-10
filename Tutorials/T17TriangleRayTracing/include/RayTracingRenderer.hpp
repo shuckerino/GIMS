@@ -7,9 +7,9 @@
 #include <gimslib/dbg/HrException.hpp>
 #include <gimslib/types.hpp>
 #include <iostream>
-#include <vector>
-#include <unordered_map>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
 
@@ -237,7 +237,7 @@ private:
   D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
   UINT                        m_raytracingOutputResourceUAVDescriptorHeapIndex;
 
-  ComPtr<ID3D12StateObject>    m_rtStateObject;
+  ComPtr<ID3D12StateObject> m_rtStateObject;
 
   // Descriptor heap
   ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
@@ -245,6 +245,10 @@ private:
   ui32                         m_descriptorSize;
 
   // Shader tables
+  static const wchar_t*  c_hitGroupName;
+  static const wchar_t*  c_raygenShaderName;
+  static const wchar_t*  c_closestHitShaderName;
+  static const wchar_t*  c_missShaderName;
   ComPtr<ID3D12Resource> m_missShaderTable;
   ComPtr<ID3D12Resource> m_hitGroupShaderTable;
   ComPtr<ID3D12Resource> m_rayGenShaderTable;
@@ -277,6 +281,7 @@ private:
   void createRayTracingResources();
   void createRayTracingInterfaces();
   void createRootSignatures();
+  void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
   void createRayTracingPipeline();
   void createShaderTables();
   void createDescriptorHeap();
@@ -290,12 +295,11 @@ private:
   D3D12_RAYTRACING_GEOMETRY_DESC createGeometryDescription();
 
   // Helper functions
-  void AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppResource,
-                         D3D12_RESOURCE_STATES initialResourceState, const wchar_t* resourceName);
-  void AllocateUploadBuffer(void* initData, ui64 dataSize, ID3D12Resource** ppResource,
-                            const wchar_t* resourceName);
+  void AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppResource, D3D12_RESOURCE_STATES initialResourceState,
+                         const wchar_t* resourceName);
+  void AllocateUploadBuffer(void* initData, ui64 dataSize, ID3D12Resource** ppResource, const wchar_t* resourceName);
   void DoRayTracing();
-
+  void CopyRaytracingOutputToBackbuffer();
   struct AccelerationStructureBuffers
   {
     ComPtr<ID3D12Resource> pScratch;      // Scratch memory for AS builder

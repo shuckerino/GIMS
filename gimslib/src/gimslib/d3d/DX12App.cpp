@@ -359,7 +359,6 @@ void DX12App::onDrawImpl()
 {
   const auto& commandList      = getCommandList();
   const auto& commandAllocator = getCommandAllocator();
-  ;
   throwIfFailed(commandAllocator->Reset());
   throwIfFailed(commandList->Reset(commandAllocator.Get(), nullptr));
 
