@@ -69,10 +69,14 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
     payload.color = float4(barycentrics, 1);
+    
+    payload.color = float4(1, 0, 0, 1); // Red
+    
 }
 
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-    payload.color = float4(0, 0, 0, 1);
+    //payload.color = float4(0, 0, 0, 1);
+    payload.color = float4(1, 1, 0, 1); // Yellow
 }

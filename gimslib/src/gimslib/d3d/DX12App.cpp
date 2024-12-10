@@ -292,6 +292,11 @@ const ComPtr<ID3D12Device>& DX12App::getDevice() const
   return m_device;
 }
 
+const ComPtr<ID3D12GraphicsCommandList>& DX12App::getCommandListAtIndex(ui8 index) const
+{
+  return m_commandLists[index];
+}
+
 const ComPtr<ID3D12GraphicsCommandList>& DX12App::getCommandList() const
 {
   return m_commandLists[m_swapChainAdapter->getFrameIndex()];

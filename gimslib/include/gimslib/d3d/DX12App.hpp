@@ -1,20 +1,19 @@
 #pragma once
-#include <d3d12.h>
 #include <D3Dcompiler.h>
+#include <d3d12.h>
 
+#include <d3dx12/d3dx12.h>
 #include <dxcapi.h>
 #include <dxgi1_6.h>
-#include <d3dx12/d3dx12.h>
 #include <gimslib/types.hpp>
 
+#include <filesystem>
+#include <gimslib/d3d/HLSLCompiler.hpp>
 #include <shellapi.h>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include <wrl.h>
-#include <filesystem>
-#include <gimslib/d3d/HLSLCompiler.hpp>
-
 
 using Microsoft::WRL::ComPtr;
 namespace gims
@@ -65,6 +64,7 @@ public:
   const ComPtr<ID3D12Device>&              getDevice() const;
   const ComPtr<ID3D12CommandQueue>&        getCommandQueue() const;
   const ComPtr<ID3D12GraphicsCommandList>& getCommandList() const;
+  const ComPtr<ID3D12GraphicsCommandList>& getCommandListAtIndex(ui8 index) const;
   const ComPtr<ID3D12CommandAllocator>&    getCommandAllocator() const;
   const ComPtr<ID3D12Resource>&            getRenderTarget() const;
   const ComPtr<ID3D12Resource>&            getDepthStencil() const;
@@ -73,9 +73,9 @@ public:
   const D3D12_VIEWPORT&                    getViewport() const;
   const D3D12_RECT&                        getRectScissor() const;
 
-  ComPtr<IDxcBlob> compileShader(const std::filesystem::path&            shaderFile,
-                                 const wchar_t* entryPoint, const wchar_t* targetProfile);
-  
+  ComPtr<IDxcBlob> compileShader(const std::filesystem::path& shaderFile, const wchar_t* entryPoint,
+                                 const wchar_t* targetProfile);
+
   LRESULT windowProcHandler(UINT message, WPARAM wParam, LPARAM lParam);
 
 private:

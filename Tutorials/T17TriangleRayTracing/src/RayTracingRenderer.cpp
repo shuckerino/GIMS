@@ -58,7 +58,7 @@ void RayTracingRenderer::AllocateUploadBuffer(void* initData, ui64 bufferSize, I
 RayTracingRenderer::RayTracingRenderer(const DX12AppConfig createInfo)
     : DX12App(createInfo)
 {
-  getDevice()->QueryInterface(IID_PPV_ARGS(&m_device));
+  throwIfFailed(getDevice()->QueryInterface(IID_PPV_ARGS(&m_dxrDevice)));
 
   if (isRayTracingSupported() == false)
   {
@@ -95,6 +95,18 @@ bool RayTracingRenderer::isRayTracingSupported()
 /// </summary>
 void RayTracingRenderer::createRayTracingResources()
 {
+  m_rayGenCB.viewport = {-1.0f, -1.0f, 1.0f, 1.0f};
+  float border        = 0.1f;
+  float aspectRatio  = static_cast<float>(getHeight()) / static_cast<float>(getWidth());
+  if (getWidth() <= getHeight())
+  {
+    m_rayGenCB.stencil = {-1 + border, -1 + border * aspectRatio, 1.0f - border, 1 - border * aspectRatio};
+  }
+  else
+  {
+    m_rayGenCB.stencil = {-1 + border / aspectRatio, -1 + border, 1 - border / aspectRatio, 1.0f - border};
+  }
+
   createRayTracingInterfaces();
   createRootSignatures();
   createRayTracingPipeline(); // not working yet
@@ -111,8 +123,13 @@ void RayTracingRenderer::createRayTracingResources()
 /// </summary>
 void RayTracingRenderer::createRayTracingInterfaces()
 {
-  throwIfFailed(getDevice()->QueryInterface(IID_PPV_ARGS(&m_device)));
-  throwIfFailed(getCommandList()->QueryInterface(IID_PPV_ARGS(&m_dxrCommandList)));
+  throwIfFailed(
+      m_dxrDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_dxrCommandAllocator)));
+  m_dxrCommandLists.resize(3);
+  for (ui8 i = 0; i < 3; i++)
+  {
+    throwIfFailed(getCommandListAtIndex(i).As(&m_dxrCommandLists[i]));
+  }
 
   std::cout << "Created ID3D12Device5 and ID3D12GraphicsCommandList4 interfaces" << std::endl;
 }
@@ -192,6 +209,18 @@ void RayTracingRenderer::createRayTracingPipeline()
   auto hitShaderByteCode = HLSLCompiler::convert(hitBlob);
 
   CD3DX12_STATE_OBJECT_DESC raytracingPipeline {D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE};
+
+  //auto                  lib     = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+  //D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void*)Triangle_cso, ARRAYSIZE(Triangle_cso));
+  //lib->SetDXILLibrary(&libdxil);
+  // Define which shader exports to surface from the library.
+  // If no shader exports are defined for a DXIL library subobject, all shaders will be surfaced.
+  // In this sample, this could be omitted for convenience since the sample uses all shaders in the library.
+  //{
+  //  lib->DefineExport(c_raygenShaderName);
+  //  lib->DefineExport(c_closestHitShaderName);
+  //  lib->DefineExport(c_missShaderName);
+  //}
 
   // DXIL (intermediate language) Library Subobject for RayGen
   auto rayGenLibrary = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
@@ -478,7 +507,7 @@ void RayTracingRenderer::createAccelerationStructures()
   };
 
   // Build acceleration structure.
-  BuildAccelerationStructure(m_dxrCommandList.Get());
+  BuildAccelerationStructure(m_dxrCommandLists[getFrameIndex()].Get());
 
   // Kick off acceleration structure construction.
   getCommandList()->Close(); // needs to be closed before execution
@@ -568,7 +597,7 @@ void RayTracingRenderer::createOutputResource()
 
   const auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
   device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc,
-                                  D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&m_raytracingOutput));
+                                  D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput));
   NAME_D3D12_OBJECT(m_raytracingOutput);
 
   D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -585,6 +614,7 @@ void RayTracingRenderer::createOutputResource()
 
 void RayTracingRenderer::onDraw()
 {
+  // throwIfFailed(m_dxrCommandList->Close());
   DoRayTracing();
   CopyRaytracingOutputToBackbuffer();
 }
@@ -598,8 +628,9 @@ void RayTracingRenderer::DoRayTracing()
   auto commandList      = getCommandList();
   auto commandAllocator = getCommandAllocator(); // Retrieve the command allocator
 
-  // Reset the command allocator and the command list
-  throwIfFailed(m_dxrCommandList->Reset(commandAllocator.Get(), nullptr));
+  // reset ray tracing specific command list
+  // throwIfFailed(m_dxrCommandAllocator->Reset());
+  // throwIfFailed(m_dxrCommandList->Reset(m_dxrCommandAllocator.Get(), nullptr));
 
   auto DispatchRays = [&](auto* commandList, auto* stateObject, auto* dispatchDesc)
   {
@@ -626,7 +657,11 @@ void RayTracingRenderer::DoRayTracing()
   commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
   commandList->SetComputeRootDescriptorTable(0, m_raytracingOutputResourceUAVGpuDescriptor);
   commandList->SetComputeRootShaderResourceView(1, m_topLevelAS->GetGPUVirtualAddress());
-  DispatchRays(m_dxrCommandList.Get(), m_dxrStateObject.Get(), &dispatchDesc);
+  DispatchRays(m_dxrCommandLists[getFrameIndex()].Get(), m_dxrStateObject.Get(), &dispatchDesc);
+  // throwIfFailed(m_dxrCommandList->Close());
+  //// Submit the command list
+  // ID3D12CommandList* commandLists[] = {m_dxrCommandList.Get()};
+  // getCommandQueue()->ExecuteCommandLists(_countof(commandLists), commandLists);
 }
 
 // Copy the raytracing output to the backbuffer.
@@ -635,33 +670,26 @@ void RayTracingRenderer::CopyRaytracingOutputToBackbuffer()
   auto commandList  = getCommandList();
   auto renderTarget = getRenderTarget().Get();
 
-  D3D12_RESOURCE_BARRIER preCopyBarriers[1];
+  D3D12_RESOURCE_BARRIER preCopyBarriers[2];
 
   // render target is copy destination
   preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET,
                                                             D3D12_RESOURCE_STATE_COPY_DEST);
 
   // uav is copy source
-  /*preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
-      m_raytracingOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);*/
+  preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
+      m_raytracingOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
   commandList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
 
   commandList->CopyResource(renderTarget, m_raytracingOutput.Get());
 
-  D3D12_RESOURCE_BARRIER postCopyBarriers[1];
+  D3D12_RESOURCE_BARRIER postCopyBarriers[2];
   postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_COPY_DEST,
                                                              D3D12_RESOURCE_STATE_RENDER_TARGET);
-  // postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get(),
-  // D3D12_RESOURCE_STATE_COPY_SOURCE,
-  //                                                            D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+  postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+                                                             D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
   commandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
-
-  //// Transition render target to RENDER_TARGET state from PRESENT
-  // const auto toRenderTarget = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget,
-  // D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-  //                                                                  D3D12_RESOURCE_STATE_RENDER_TARGET);
-  // commandList->ResourceBarrier(1, &toRenderTarget);
 }
 
 #pragma endregion

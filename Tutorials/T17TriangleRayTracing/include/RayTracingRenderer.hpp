@@ -1,6 +1,5 @@
 #pragma once
-#include "nv_helpers_dx12/TopLevelASGenerator.h"
-#include <dxcapi.h>
+//#include <dxcapi.h>
 #include <gimslib/d3d/DX12App.hpp>
 #include <gimslib/d3d/DX12Util.hpp>
 #include <gimslib/d3d/UploadHelper.hpp>
@@ -10,6 +9,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "../shaders/hlsl.h"
 
 #define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
 
@@ -205,7 +205,7 @@ public:
 
   ID3D12Device5* getRTDevice()
   {
-    return m_device.Get();
+    return m_dxrDevice.Get();
   }
 
   /// <summary>
@@ -220,9 +220,12 @@ public:
 
 private:
   // DirectX ray tracing interfaces
-  ComPtr<ID3D12Device5>              m_device;
-  ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
+  ComPtr<ID3D12Device5>              m_dxrDevice;
+  //ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
+  std::vector<ComPtr<ID3D12GraphicsCommandList4>> m_dxrCommandLists;
   ComPtr<ID3D12StateObject>          m_dxrStateObject;
+  ComPtr<ID3D12CommandAllocator> m_dxrCommandAllocator;
+  ComPtr<ID3D12CommandQueue>         m_dxrCommandQueue;
 
   // Acceleration structure
   ComPtr<ID3D12Resource> m_topLevelAS;
