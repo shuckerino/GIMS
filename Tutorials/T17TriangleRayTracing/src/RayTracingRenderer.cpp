@@ -10,6 +10,23 @@ const wchar_t* RayTracingRenderer::c_missShaderName       = L"MyMissShader";
 
 #pragma region Helper functions
 
+inline void AllocateUploadBuffer(ID3D12Device* pDevice, void* pData, UINT64 datasize, ID3D12Resource** ppResource,
+                                 const wchar_t* resourceName = nullptr)
+{
+  auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+  auto bufferDesc           = CD3DX12_RESOURCE_DESC::Buffer(datasize);
+  throwIfFailed(pDevice->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &bufferDesc,
+                                                 D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(ppResource)));
+  if (resourceName)
+  {
+    (*ppResource)->SetName(resourceName);
+  }
+  void* pMappedData;
+  (*ppResource)->Map(0, nullptr, &pMappedData);
+  memcpy(pMappedData, pData, datasize);
+  (*ppResource)->Unmap(0, nullptr);
+}
+
 void RayTracingRenderer::AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppResource,
                                            D3D12_RESOURCE_STATES initialResourceState, const wchar_t* resourceName)
 {
@@ -31,24 +48,6 @@ void RayTracingRenderer::AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppR
   throwIfFailed(getDevice()->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &desc,
                                                      initialResourceState, nullptr, IID_PPV_ARGS(ppResource)));
   (*ppResource)->SetName(resourceName);
-}
-
-void RayTracingRenderer::AllocateUploadBuffer(void* initData, ui64 bufferSize, ID3D12Resource** ppResource,
-                                              const wchar_t* resourceName)
-{
-  auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-  auto bufferDesc           = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
-  throwIfFailed(getDevice()->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &bufferDesc,
-                                                     D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-                                                     IID_PPV_ARGS(ppResource)));
-  if (resourceName)
-  {
-    (*ppResource)->SetName(resourceName);
-  }
-  void* pMappedData;
-  (*ppResource)->Map(0, nullptr, &pMappedData);
-  memcpy(pMappedData, initData, bufferSize);
-  (*ppResource)->Unmap(0, nullptr);
 }
 
 #pragma endregion
@@ -97,7 +96,7 @@ void RayTracingRenderer::createRayTracingResources()
 {
   m_rayGenCB.viewport = {-1.0f, -1.0f, 1.0f, 1.0f};
   float border        = 0.1f;
-  float aspectRatio  = static_cast<float>(getHeight()) / static_cast<float>(getWidth());
+  float aspectRatio   = static_cast<float>(getHeight()) / static_cast<float>(getWidth());
   if (getWidth() <= getHeight())
   {
     m_rayGenCB.stencil = {-1 + border, -1 + border * aspectRatio, 1.0f - border, 1 - border * aspectRatio};
@@ -210,17 +209,17 @@ void RayTracingRenderer::createRayTracingPipeline()
 
   CD3DX12_STATE_OBJECT_DESC raytracingPipeline {D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE};
 
-  //auto                  lib     = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-  //D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void*)Triangle_cso, ARRAYSIZE(Triangle_cso));
-  //lib->SetDXILLibrary(&libdxil);
-  // Define which shader exports to surface from the library.
-  // If no shader exports are defined for a DXIL library subobject, all shaders will be surfaced.
-  // In this sample, this could be omitted for convenience since the sample uses all shaders in the library.
+  // auto                  lib     = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+  // D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void*)Triangle_cso, ARRAYSIZE(Triangle_cso));
+  // lib->SetDXILLibrary(&libdxil);
+  //  Define which shader exports to surface from the library.
+  //  If no shader exports are defined for a DXIL library subobject, all shaders will be surfaced.
+  //  In this sample, this could be omitted for convenience since the sample uses all shaders in the library.
   //{
-  //  lib->DefineExport(c_raygenShaderName);
-  //  lib->DefineExport(c_closestHitShaderName);
-  //  lib->DefineExport(c_missShaderName);
-  //}
+  //   lib->DefineExport(c_raygenShaderName);
+  //   lib->DefineExport(c_closestHitShaderName);
+  //   lib->DefineExport(c_missShaderName);
+  // }
 
   // DXIL (intermediate language) Library Subobject for RayGen
   auto rayGenLibrary = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
@@ -426,7 +425,24 @@ void RayTracingRenderer::createAccelerationStructures()
   // Reset the command list for the acceleration structure construction.
   getCommandList()->Reset(getCommandAllocator().Get(), nullptr);
 
-  const auto geometryDescription = createGeometryDescription();
+  // const auto geometryDescription = createGeometryDescription();
+
+  D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
+  geometryDesc.Type                           = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+  geometryDesc.Triangles.IndexBuffer          = m_indexBuffer->GetGPUVirtualAddress();
+  geometryDesc.Triangles.IndexCount           = static_cast<UINT>(m_indexBuffer->GetDesc().Width) / sizeof(Index);
+  geometryDesc.Triangles.IndexFormat          = DXGI_FORMAT_R16_UINT;
+  geometryDesc.Triangles.Transform3x4         = 0;
+  geometryDesc.Triangles.VertexFormat         = DXGI_FORMAT_R32G32B32_FLOAT;
+  geometryDesc.Triangles.VertexCount          = static_cast<UINT>(m_vertexBuffer->GetDesc().Width) / sizeof(Vertex);
+  geometryDesc.Triangles.VertexBuffer.StartAddress  = m_vertexBuffer->GetGPUVirtualAddress();
+  geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
+
+  // Mark the geometry as opaque.
+  // PERFORMANCE TIP: mark geometry as opaque whenever applicable as it can enable important ray processing
+  // optimizations. Note: When rays encounter opaque geometry an any hit shader will not be executed whether it is
+  // present or not.
+  geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
   // Get required sizes for an acceleration structure.
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};
@@ -442,7 +458,7 @@ void RayTracingRenderer::createAccelerationStructures()
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS  bottomLevelInputs       = topLevelInputs;
   bottomLevelInputs.Type           = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-  bottomLevelInputs.pGeometryDescs = &geometryDescription;
+  bottomLevelInputs.pGeometryDescs = &geometryDesc;
   getRTDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
   throwIfZero(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
@@ -479,7 +495,7 @@ void RayTracingRenderer::createAccelerationStructures()
   instanceDesc.Transform[2][2]                = 1.0f;
   instanceDesc.InstanceMask                   = 1;
   instanceDesc.AccelerationStructure          = m_bottomLevelAS->GetGPUVirtualAddress();
-  AllocateUploadBuffer(&instanceDesc, sizeof(instanceDesc), &instanceDescs, L"InstanceDescs");
+  AllocateUploadBuffer(getDevice().Get(), &instanceDesc, sizeof(instanceDesc), &instanceDescs, L"InstanceDescs");
 
   // Bottom Level Acceleration Structure desc
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
@@ -520,47 +536,65 @@ void RayTracingRenderer::createAccelerationStructures()
 
 void RayTracingRenderer::createGeometry()
 {
-  // Create vertex buffer
-  f32                 depthValue = 1.0f;
-  f32                 offset     = 0.7f;
-  std::vector<Vertex> vertexBuffer;
-  vertexBuffer.reserve(3);
-  f32v3 position1 = f32v3(0.0f, offset, depthValue);
-  f32v3 position2 = f32v3(-offset, offset, depthValue);
-  f32v3 position3 = f32v3(offset, offset, depthValue);
-  vertexBuffer.emplace_back(position1);
-  vertexBuffer.emplace_back(position2);
-  vertexBuffer.emplace_back(position3);
+  //// Create vertex buffer
+  // f32                 depthValue = 1.0f;
+  // f32                 offset     = 0.7f;
+  // std::vector<Vertex> vertexBuffer;
+  // vertexBuffer.reserve(3);
+  // f32v3 position1 = f32v3(0.0f, offset, depthValue);
+  // f32v3 position2 = f32v3(-offset, offset, depthValue);
+  // f32v3 position3 = f32v3(offset, offset, depthValue);
+  // vertexBuffer.emplace_back(position1);
+  // vertexBuffer.emplace_back(position2);
+  // vertexBuffer.emplace_back(position3);
 
-  m_vertexBufferSize = static_cast<ui32>(vertexBuffer.size() * sizeof(Vertex));
+  // m_vertexBufferSize = static_cast<ui32>(vertexBuffer.size() * sizeof(Vertex));
 
-  UploadHelper uploadHelper(getRTDevice(), m_vertexBufferSize);
+  // UploadHelper uploadHelper(getDevice(), m_vertexBufferSize);
 
-  // Create resource on GPU
-  const CD3DX12_RESOURCE_DESC   vertexBufferDescription = CD3DX12_RESOURCE_DESC::Buffer(m_vertexBufferSize);
-  const CD3DX12_HEAP_PROPERTIES defaultHeapProperties   = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-  getRTDevice()->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &vertexBufferDescription,
-                                         D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_vertexBuffer));
+  //// Create resource on GPU
+  // const CD3DX12_RESOURCE_DESC   vertexBufferDescription = CD3DX12_RESOURCE_DESC::Buffer(m_vertexBufferSize);
+  // const CD3DX12_HEAP_PROPERTIES defaultHeapProperties   = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+  // getDevice()->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &vertexBufferDescription,
+  //                                      D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_vertexBuffer));
 
-  // Upload to GPU
-  uploadHelper.uploadBuffer(vertexBuffer.data(), m_vertexBuffer, m_vertexBufferSize, getCommandQueue());
-  m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-  m_vertexBufferView.SizeInBytes    = m_vertexBufferSize;
-  m_vertexBufferView.StrideInBytes  = sizeof(Vertex);
+  //// Upload to GPU
+  //// uploadHelper.uploadBuffer(vertexBuffer.data(), m_vertexBuffer, m_vertexBufferSize, getCommandQueue());
+  //// m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+  //// m_vertexBufferView.SizeInBytes    = m_vertexBufferSize;
+  //// m_vertexBufferView.StrideInBytes  = sizeof(Vertex);
 
-  // Create index buffer
-  std::vector<ui32> indices = {0, 1, 2};
-  m_indexBufferSize         = static_cast<ui32>(indices.size() * sizeof(ui32));
+  //// Create index buffer
+  // std::vector<ui32> indices = {0, 1, 2};
+  // m_indexBufferSize         = static_cast<ui32>(indices.size() * sizeof(ui32));
 
-  UploadHelper                uploadHelperIndexBuffer(getRTDevice(), m_indexBufferSize);
-  const CD3DX12_RESOURCE_DESC indexBufferDescription = CD3DX12_RESOURCE_DESC::Buffer(m_indexBufferSize);
-  getRTDevice()->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &indexBufferDescription,
-                                         D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_indexBuffer));
+  // UploadHelper                uploadHelperIndexBuffer(getDevice(), m_indexBufferSize);
+  // const CD3DX12_RESOURCE_DESC indexBufferDescription = CD3DX12_RESOURCE_DESC::Buffer(m_indexBufferSize);
+  // getDevice()->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &indexBufferDescription,
+  //                                      D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_indexBuffer));
 
-  uploadHelperIndexBuffer.uploadBuffer(indices.data(), m_indexBuffer, m_indexBufferSize, getCommandQueue());
-  m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-  m_indexBufferView.SizeInBytes    = m_indexBufferSize;
-  m_indexBufferView.Format         = DXGI_FORMAT_R32_UINT;
+  // AllocateUploadBuffer(getDevice().Get(), vertexBuffer.data(), sizeof(vertexBuffer), &m_vertexBuffer);
+  // AllocateUploadBuffer(getDevice().Get(), indices.data(), sizeof(indices), &m_indexBuffer);
+
+  //// uploadHelperIndexBuffer.uploadBuffer(indices.data(), m_indexBuffer, m_indexBufferSize, getCommandQueue());
+  //// m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+  //// m_indexBufferView.SizeInBytes    = m_indexBufferSize;
+  //// m_indexBufferView.Format         = DXGI_FORMAT_R32_UINT;
+
+  auto  device    = getDevice().Get();
+  Index indices[] = {0, 1, 2};
+
+  float  depthValue = 1.0;
+  float  offset     = 0.7f;
+  Vertex vertices[] = {// The sample raytraces in screen space coordinates.
+                       // Since DirectX screen space coordinates are right handed (i.e. Y axis points down).
+                       // Define the vertices in counter clockwise order ~ clockwise in left handed.
+                       {0, -offset, depthValue},
+                       {-offset, offset, depthValue},
+                       {offset, offset, depthValue}};
+
+  AllocateUploadBuffer(device, vertices, sizeof(vertices), &m_vertexBuffer);
+  AllocateUploadBuffer(device, indices, sizeof(indices), &m_indexBuffer);
 }
 
 void RayTracingRenderer::createDescriptorHeap()

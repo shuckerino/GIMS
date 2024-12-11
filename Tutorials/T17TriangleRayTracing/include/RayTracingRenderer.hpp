@@ -198,10 +198,15 @@ class RayTracingRenderer : public DX12App
 public:
   RayTracingRenderer(const DX12AppConfig createInfo);
 
+  //struct Vertex
+  //{
+  //  f32v3 position;
+  //};
   struct Vertex
   {
-    f32v3 position;
+    float v1, v2, v3;
   };
+
 
   ID3D12Device5* getRTDevice()
   {
@@ -272,12 +277,13 @@ private:
   RayGenConstantBuffer m_rayGenCB;
 
   // Geometry
+  typedef UINT16 Index;
   ui32                     m_vertexBufferSize; //! Vertex buffer size in bytes.
   ui32                     m_indexBufferSize;  //! Index buffer size in bytes.
   ComPtr<ID3D12Resource>   m_indexBuffer;
   ComPtr<ID3D12Resource>   m_vertexBuffer;
-  D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
-  D3D12_INDEX_BUFFER_VIEW  m_indexBufferView;
+  //D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+  //D3D12_INDEX_BUFFER_VIEW  m_indexBufferView;
 
   // Init functions
   bool isRayTracingSupported();
@@ -300,7 +306,6 @@ private:
   // Helper functions
   void AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppResource, D3D12_RESOURCE_STATES initialResourceState,
                          const wchar_t* resourceName);
-  void AllocateUploadBuffer(void* initData, ui64 dataSize, ID3D12Resource** ppResource, const wchar_t* resourceName);
   void DoRayTracing();
   void CopyRaytracingOutputToBackbuffer();
   struct AccelerationStructureBuffers
