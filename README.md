@@ -1,1 +1,1 @@
-### GImS RayTracing Project
+### Project for GIMS (GPU Image Synthesis)
