@@ -64,7 +64,7 @@ HWND createWindow(std::wstring title, ui32 width, ui32 height, gims::DX12App* dx
                       dx12App);
 }
 
-ComPtr<ID3D12InfoQueue> createD3D12InfoQueue(bool c_debug, ComPtr<ID3D12Device>& device)
+ComPtr<ID3D12InfoQueue> createD3D12InfoQueue(bool c_debug, ComPtr<ID3D12Device5>& device)
 {
   ComPtr<ID3D12InfoQueue> result = nullptr;
   if (c_debug)
@@ -173,9 +173,9 @@ ComPtr<IDXGIAdapter1> GetHardwareAdapter(IDXGIFactory1* pFactory, D3D_FEATURE_LE
   return adapter;
 }
 
-ComPtr<ID3D12Device> createDevice(bool debug, D3D_FEATURE_LEVEL d3d_featureLevel, const ComPtr<IDXGIFactory4>& factory)
+ComPtr<ID3D12Device5> createDevice(bool debug, D3D_FEATURE_LEVEL d3d_featureLevel, const ComPtr<IDXGIFactory4>& factory)
 {
-  ComPtr<ID3D12Device> device;
+  ComPtr<ID3D12Device5> device;
 
   ComPtr<IDXGIInfoQueue> dxgiInfoQueue   = createDXGIInfoQueue(debug);
   ComPtr<IDXGIAdapter1>  hardwareAdapter = GetHardwareAdapter(factory.Get(), d3d_featureLevel);
@@ -220,10 +220,10 @@ std::vector<ComPtr<ID3D12CommandAllocator>> createCommandAllocators(const ComPtr
   return result;
 }
 
-std::vector<ComPtr<ID3D12GraphicsCommandList>> createCommandLists(
+std::vector<ComPtr<ID3D12GraphicsCommandList4>> createCommandLists(
     const std::vector<ComPtr<ID3D12CommandAllocator>>& commandAllocators)
 {
-  std::vector<ComPtr<ID3D12GraphicsCommandList>> result(commandAllocators.size());
+  std::vector<ComPtr<ID3D12GraphicsCommandList4>> result(commandAllocators.size());
 
   for (size_t i = 0; i < result.size(); i++)
   {
@@ -258,12 +258,10 @@ DX12App::DX12App(const DX12AppConfig config)
     , m_hwnd(createWindow(m_config.title, m_config.width, m_config.height, this))
     , m_factory(createDXGIFactory(m_config.debug))
     , m_device(createDevice(m_config.debug, m_config.d3d_featureLevel, m_factory))
-    , m_dxrDevice(createRTDevice(m_device))
     , m_hlslCompiler()
     , m_commandQueue(createCommandQueue(m_device))
     , m_commandAllocators(createCommandAllocators(m_device, m_config.frameCount))
     , m_commandLists(createCommandLists(m_commandAllocators))
-    , m_dxrCommandLists(createDXRCommandLists(m_commandLists))
     , m_imGUIAdapter(
           std::make_unique<impl::ImGUIAdapter>(m_hwnd, m_device, m_config.frameCount, m_config.renderTargetFormat))
     , m_swapChainAdapter(
@@ -311,19 +309,9 @@ void DX12App::waitForGPU()
   m_swapChainAdapter->waitForGPU();
 }
 
-const ComPtr<ID3D12Device>& DX12App::getDevice() const
+const ComPtr<ID3D12Device5>& DX12App::getDevice() const
 {
   return m_device;
-}
-
-const ComPtr<ID3D12Device5>& DX12App::getDXRDevice() const
-{
-  return m_dxrDevice;
-}
-
-const ComPtr<ID3D12GraphicsCommandList4>& DX12App::getDXRCommandList() const
-{
-  return m_dxrCommandLists[m_swapChainAdapter->getFrameIndex()];
 }
 
 const ComPtr<ID3D12StateObject>& DX12App::getDXRStateObject() const
@@ -331,7 +319,7 @@ const ComPtr<ID3D12StateObject>& DX12App::getDXRStateObject() const
   return m_dxrStateObject;
 }
 
-const ComPtr<ID3D12GraphicsCommandList>& DX12App::getCommandList() const
+const ComPtr<ID3D12GraphicsCommandList4>& DX12App::getCommandList() const
 {
   return m_commandLists[m_swapChainAdapter->getFrameIndex()];
 }

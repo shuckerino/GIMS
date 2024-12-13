@@ -62,11 +62,9 @@ public:
   ui32  getWidth() const;
   ui32  getHeight() const;
 
-  const ComPtr<ID3D12Device>&               getDevice() const;
-  const ComPtr<ID3D12Device5>&              getDXRDevice() const;
+  const ComPtr<ID3D12Device5>&              getDevice() const;
   const ComPtr<ID3D12CommandQueue>&         getCommandQueue() const;
-  const ComPtr<ID3D12GraphicsCommandList>&  getCommandList() const;
-  const ComPtr<ID3D12GraphicsCommandList4>& getDXRCommandList() const;
+  const ComPtr<ID3D12GraphicsCommandList4>& getCommandList() const;
   const ComPtr<ID3D12StateObject>&          getDXRStateObject() const;
   const ComPtr<ID3D12CommandAllocator>&     getCommandAllocator() const;
   const ComPtr<ID3D12Resource>&             getRenderTarget() const;
@@ -91,24 +89,18 @@ private:
     bool minimized = false;
   };
 
-  DX12AppConfig                                  m_config;
-  HWND                                           m_hwnd;
-  ComPtr<IDXGIFactory4>                          m_factory;
-  ComPtr<ID3D12Device>                           m_device;
-  gims::HLSLCompiler                             m_hlslCompiler;
-  ComPtr<ID3D12CommandQueue>                     m_commandQueue;
-  std::vector<ComPtr<ID3D12CommandAllocator>>    m_commandAllocators;
-  std::vector<ComPtr<ID3D12GraphicsCommandList>> m_commandLists;
-  std::unique_ptr<impl::ImGUIAdapter>            m_imGUIAdapter;
-  std::unique_ptr<impl::SwapChainAdapter>        m_swapChainAdapter;
-  WindowState                                    m_windowState;
-
-  // RayTracing specific member
-  ComPtr<ID3D12Device5> m_dxrDevice; // existing device "casted"
-  std::vector<ComPtr<ID3D12GraphicsCommandList4>>
-      m_dxrCommandLists; // existing command lists "casted" -> if regular command list gets closed, the corresponding
-                         // one here also gets closed
-  ComPtr<ID3D12StateObject> m_dxrStateObject;
+  DX12AppConfig                                   m_config;
+  HWND                                            m_hwnd;
+  ComPtr<IDXGIFactory4>                           m_factory;
+  ComPtr<ID3D12Device5>                           m_device;
+  gims::HLSLCompiler                              m_hlslCompiler;
+  ComPtr<ID3D12CommandQueue>                      m_commandQueue;
+  std::vector<ComPtr<ID3D12CommandAllocator>>     m_commandAllocators;
+  std::vector<ComPtr<ID3D12GraphicsCommandList4>> m_commandLists;
+  std::unique_ptr<impl::ImGUIAdapter>             m_imGUIAdapter;
+  std::unique_ptr<impl::SwapChainAdapter>         m_swapChainAdapter;
+  WindowState                                     m_windowState;
+  ComPtr<ID3D12StateObject>                       m_dxrStateObject; // used for ray tracing
 
   void onDrawImpl();
 };

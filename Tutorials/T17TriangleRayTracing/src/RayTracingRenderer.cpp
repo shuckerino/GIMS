@@ -260,7 +260,7 @@ RayTracingRenderer::RayTracingRenderer(const DX12AppConfig createInfo)
 bool RayTracingRenderer::isRayTracingSupported()
 {
   D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
-  throwIfFailed(getDXRDevice()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5)));
+  throwIfFailed(getDevice()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5)));
   if (options5.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
   {
     std::cout << "Ray tracing not supported on this device" << std::endl;
@@ -418,7 +418,7 @@ void RayTracingRenderer::createRayTracingPipeline()
   UINT maxRecursionDepth       = 1; // primary rays only.
   pipelineConfigSubobject->Config(maxRecursionDepth);
 
-  setDXRStateObject(raytracingPipeline, getDXRDevice());
+  setDXRStateObject(raytracingPipeline, getDevice());
 
   std::cout << "Created ray tracing pipeline" << std::endl;
 }
@@ -536,14 +536,14 @@ void RayTracingRenderer::createAccelerationStructures()
   topLevelInputs.Type     = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
-  getDXRDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
+  getDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
   throwIfZero(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS  bottomLevelInputs       = topLevelInputs;
   bottomLevelInputs.Type           = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
   bottomLevelInputs.pGeometryDescs = &geometryDesc;
-  getDXRDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+  getDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
   throwIfZero(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
   // Scratch resource used to
@@ -636,7 +636,7 @@ void RayTracingRenderer::createAccelerationStructures()
   };
 
   // Build acceleration structure.
-  BuildAccelerationStructure(getDXRCommandList().Get());
+  BuildAccelerationStructure(getCommandList().Get());
 
   // Start acceleration structure construction
   getCommandList()->Close(); // needs to be closed before execution
@@ -804,7 +804,7 @@ void RayTracingRenderer::DoRayTracing()
   commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
   commandList->SetComputeRootDescriptorTable(0, m_raytracingOutputResourceUAVGpuDescriptor);
   commandList->SetComputeRootShaderResourceView(1, m_topLevelAS->GetGPUVirtualAddress());
-  DispatchRays(getDXRCommandList().Get(), getDXRStateObject().Get(), &dispatchDesc); // pass ray tracing specific command list
+  DispatchRays(getCommandList().Get(), getDXRStateObject().Get(), &dispatchDesc); // pass ray tracing specific command list
 }
 
 void RayTracingRenderer::CopyRaytracingOutputToBackbuffer()
