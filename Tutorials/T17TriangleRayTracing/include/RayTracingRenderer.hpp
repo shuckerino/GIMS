@@ -178,12 +178,6 @@ public:
     float v1, v2, v3;
   };
 
-
-  ID3D12Device5* getRTDevice()
-  {
-    return m_dxrDevice.Get();
-  }
-
   /// <summary>
   /// Called whenever a new frame is drawn.
   /// </summary>
@@ -195,14 +189,6 @@ public:
   virtual void onDrawUI();
 
 private:
-  // DirectX ray tracing interfaces
-  ComPtr<ID3D12Device5>              m_dxrDevice;
-  //ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
-  std::vector<ComPtr<ID3D12GraphicsCommandList4>> m_dxrCommandLists;
-  ComPtr<ID3D12StateObject>          m_dxrStateObject;
-  ComPtr<ID3D12CommandAllocator> m_dxrCommandAllocator;
-  ComPtr<ID3D12CommandQueue>         m_dxrCommandQueue;
-
   // Acceleration structure
   ComPtr<ID3D12Resource> m_topLevelAS;
   ComPtr<ID3D12Resource> m_bottomLevelAS;

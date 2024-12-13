@@ -33,9 +33,7 @@ inline void SetNameIndexed(ID3D12Object*, LPCWSTR, UINT)
 #define NAME_D3D12_OBJECT(x)            SetName((x).Get(), L#x)
 #define NAME_D3D12_OBJECT_INDEXED(x, n) SetNameIndexed((x)[n].Get(), L#x, n)
 
-
 } // namespace
-
 
 // constant shader names
 const wchar_t* RayTracingRenderer::c_hitGroupName         = L"MyHitGroup";
@@ -92,8 +90,6 @@ void RayTracingRenderer::AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppR
 RayTracingRenderer::RayTracingRenderer(const DX12AppConfig createInfo)
     : DX12App(createInfo)
 {
-  throwIfFailed(getDevice()->QueryInterface(IID_PPV_ARGS(&m_dxrDevice)));
-
   if (isRayTracingSupported() == false)
   {
     throw std::runtime_error("Ray tracing not supported on this device");
@@ -111,7 +107,7 @@ RayTracingRenderer::RayTracingRenderer(const DX12AppConfig createInfo)
 bool RayTracingRenderer::isRayTracingSupported()
 {
   D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
-  throwIfFailed(getRTDevice()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5)));
+  throwIfFailed(getDXRDevice()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5)));
   if (options5.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
   {
     std::cout << "Ray tracing not supported on this device" << std::endl;
@@ -157,13 +153,13 @@ void RayTracingRenderer::createRayTracingResources()
 /// </summary>
 void RayTracingRenderer::createRayTracingInterfaces()
 {
-  throwIfFailed(
-      m_dxrDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_dxrCommandAllocator)));
-  m_dxrCommandLists.resize(3);
-  for (ui8 i = 0; i < 3; i++)
-  {
-    throwIfFailed(getCommandListAtIndex(i).As(&m_dxrCommandLists[i]));
-  }
+  // throwIfFailed(
+  //     m_dxrDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_dxrCommandAllocator)));
+  // m_dxrCommandLists.resize(3);
+  // for (ui8 i = 0; i < 3; i++)
+  //{
+  //   throwIfFailed(getCommandListAtIndex(i).As(&m_dxrCommandLists[i]));
+  // }
 
   std::cout << "Created ID3D12Device5 and ID3D12GraphicsCommandList4 interfaces" << std::endl;
 }
@@ -299,7 +295,7 @@ void RayTracingRenderer::createRayTracingPipeline()
   UINT maxRecursionDepth       = 1; // primary rays only.
   pipelineConfigSubobject->Config(maxRecursionDepth);
 
-  throwIfFailed(getRTDevice()->CreateStateObject(raytracingPipeline, IID_PPV_ARGS(&m_dxrStateObject)));
+  setDXRStateObject(raytracingPipeline, getDXRDevice());
 
   std::cout << "Created ray tracing pipeline" << std::endl;
 
@@ -393,7 +389,7 @@ void RayTracingRenderer::createShaderTables()
   UINT shaderIdentifierSize;
   {
     ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
-    throwIfFailed(m_dxrStateObject.As(&stateObjectProperties)); // first fix state object creation
+    throwIfFailed(getDXRStateObject().As(&stateObjectProperties));
     GetShaderIdentifiers(stateObjectProperties.Get());
     shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
   }
@@ -487,14 +483,14 @@ void RayTracingRenderer::createAccelerationStructures()
   topLevelInputs.Type     = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
-  getRTDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
+  getDXRDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
   throwIfZero(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS  bottomLevelInputs       = topLevelInputs;
   bottomLevelInputs.Type           = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
   bottomLevelInputs.pGeometryDescs = &geometryDesc;
-  getRTDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+  getDXRDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
   throwIfZero(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
   // Scratch resource used to
@@ -558,7 +554,7 @@ void RayTracingRenderer::createAccelerationStructures()
   };
 
   // Build acceleration structure.
-  BuildAccelerationStructure(m_dxrCommandLists[getFrameIndex()].Get());
+  BuildAccelerationStructure(getDXRCommandList().Get());
 
   // Kick off acceleration structure construction.
   getCommandList()->Close(); // needs to be closed before execution
@@ -726,7 +722,7 @@ void RayTracingRenderer::DoRayTracing()
   commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
   commandList->SetComputeRootDescriptorTable(0, m_raytracingOutputResourceUAVGpuDescriptor);
   commandList->SetComputeRootShaderResourceView(1, m_topLevelAS->GetGPUVirtualAddress());
-  DispatchRays(m_dxrCommandLists[getFrameIndex()].Get(), m_dxrStateObject.Get(), &dispatchDesc);
+  DispatchRays(getDXRCommandList().Get(), getDXRStateObject().Get(), &dispatchDesc);
   // throwIfFailed(m_dxrCommandList->Close());
   //// Submit the command list
   // ID3D12CommandList* commandLists[] = {m_dxrCommandList.Get()};

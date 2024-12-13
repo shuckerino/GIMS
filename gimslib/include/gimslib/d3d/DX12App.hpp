@@ -1,4 +1,4 @@
-//#pragma once
+// #pragma once
 #include <d3d12.h>
 #include <D3Dcompiler.h>
 
@@ -61,17 +61,21 @@ public:
   ui32  getWidth() const;
   ui32  getHeight() const;
 
-  const ComPtr<ID3D12Device>&              getDevice() const;
-  const ComPtr<ID3D12CommandQueue>&        getCommandQueue() const;
-  const ComPtr<ID3D12GraphicsCommandList>& getCommandList() const;
-  const ComPtr<ID3D12GraphicsCommandList>& getCommandListAtIndex(ui8 index) const;
-  const ComPtr<ID3D12CommandAllocator>&    getCommandAllocator() const;
-  const ComPtr<ID3D12Resource>&            getRenderTarget() const;
-  const ComPtr<ID3D12Resource>&            getDepthStencil() const;
-  CD3DX12_CPU_DESCRIPTOR_HANDLE            getRTVHandle();
-  CD3DX12_CPU_DESCRIPTOR_HANDLE            getDSVHandle();
-  const D3D12_VIEWPORT&                    getViewport() const;
-  const D3D12_RECT&                        getRectScissor() const;
+  const ComPtr<ID3D12Device>&               getDevice() const;
+  const ComPtr<ID3D12Device5>&              getDXRDevice() const;
+  const ComPtr<ID3D12CommandQueue>&         getCommandQueue() const;
+  const ComPtr<ID3D12GraphicsCommandList>&  getCommandList() const;
+  const ComPtr<ID3D12GraphicsCommandList4>& getDXRCommandList() const;
+  const ComPtr<ID3D12StateObject>&          getDXRStateObject() const;
+  const ComPtr<ID3D12CommandAllocator>&     getCommandAllocator() const;
+  const ComPtr<ID3D12Resource>&             getRenderTarget() const;
+  const ComPtr<ID3D12Resource>&             getDepthStencil() const;
+  CD3DX12_CPU_DESCRIPTOR_HANDLE             getRTVHandle();
+  CD3DX12_CPU_DESCRIPTOR_HANDLE             getDSVHandle();
+  const D3D12_VIEWPORT&                     getViewport() const;
+  const D3D12_RECT&                         getRectScissor() const;
+
+  void setDXRStateObject(CD3DX12_STATE_OBJECT_DESC& stateObjectDescription, ComPtr<ID3D12Device5> device);
 
   ComPtr<IDxcBlob> compileShader(const std::filesystem::path& shaderFile, const wchar_t* entryPoint,
                                  const wchar_t* targetProfile);
@@ -97,6 +101,13 @@ private:
   std::unique_ptr<impl::ImGUIAdapter>            m_imGUIAdapter;
   std::unique_ptr<impl::SwapChainAdapter>        m_swapChainAdapter;
   WindowState                                    m_windowState;
+
+  // RayTracing specific member
+  ComPtr<ID3D12Device5> m_dxrDevice; // existing device "casted"
+  std::vector<ComPtr<ID3D12GraphicsCommandList4>>
+      m_dxrCommandLists; // existing command lists "casted" -> if regular command list gets closed, the corresponding
+                         // one here also gets closed
+  ComPtr<ID3D12StateObject> m_dxrStateObject;
 
   void onDrawImpl();
 };

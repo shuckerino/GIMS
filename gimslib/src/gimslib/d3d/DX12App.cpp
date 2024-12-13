@@ -1,8 +1,8 @@
 #include "impl/ImGUIAdapter.hpp"
 #include "impl/SwapChainAdapter.hpp"
+#include <d3dx12/d3dx12.h>
 #include <dxgi1_6.h>
 #include <dxgidebug.h>
-#include <d3dx12/d3dx12.h>
 #include <gimslib/d3d/DX12App.hpp>
 #include <gimslib/d3d/DX12Util.hpp>
 #include <gimslib/dbg/HrException.hpp>
@@ -18,7 +18,6 @@ extern "C"
 {
   __declspec(dllexport) extern const char* D3D12SDKPath = ".\\";
 }
-
 
 using namespace gims;
 
@@ -188,6 +187,15 @@ ComPtr<ID3D12Device> createDevice(bool debug, D3D_FEATURE_LEVEL d3d_featureLevel
   return device;
 }
 
+ComPtr<ID3D12Device5> createRTDevice(ComPtr<ID3D12Device> device)
+{
+  ComPtr<ID3D12Device5> rtDevice;
+
+  throwIfFailed(device->QueryInterface(IID_PPV_ARGS(&rtDevice)));
+
+  return rtDevice;
+}
+
 ComPtr<ID3D12CommandQueue> createCommandQueue(const ComPtr<ID3D12Device>& device)
 {
   ComPtr<ID3D12CommandQueue> result;
@@ -227,6 +235,20 @@ std::vector<ComPtr<ID3D12GraphicsCommandList>> createCommandLists(
   return result;
 }
 
+std::vector<ComPtr<ID3D12GraphicsCommandList4>> createDXRCommandLists(
+    const std::vector<ComPtr<ID3D12GraphicsCommandList>>& commandLists)
+{
+  std::vector<ComPtr<ID3D12GraphicsCommandList4>> result;
+  result.resize(commandLists.size());
+
+  for (ui8 i = 0; i < commandLists.size(); i++)
+  {
+    throwIfFailed(commandLists.at(i).As(&result[i]));
+  }
+
+  return result;
+}
+
 } // namespace
 
 namespace gims
@@ -236,10 +258,12 @@ DX12App::DX12App(const DX12AppConfig config)
     , m_hwnd(createWindow(m_config.title, m_config.width, m_config.height, this))
     , m_factory(createDXGIFactory(m_config.debug))
     , m_device(createDevice(m_config.debug, m_config.d3d_featureLevel, m_factory))
+    , m_dxrDevice(createRTDevice(m_device))
     , m_hlslCompiler()
     , m_commandQueue(createCommandQueue(m_device))
     , m_commandAllocators(createCommandAllocators(m_device, m_config.frameCount))
     , m_commandLists(createCommandLists(m_commandAllocators))
+    , m_dxrCommandLists(createDXRCommandLists(m_commandLists))
     , m_imGUIAdapter(
           std::make_unique<impl::ImGUIAdapter>(m_hwnd, m_device, m_config.frameCount, m_config.renderTargetFormat))
     , m_swapChainAdapter(
@@ -292,9 +316,19 @@ const ComPtr<ID3D12Device>& DX12App::getDevice() const
   return m_device;
 }
 
-const ComPtr<ID3D12GraphicsCommandList>& DX12App::getCommandListAtIndex(ui8 index) const
+const ComPtr<ID3D12Device5>& DX12App::getDXRDevice() const
 {
-  return m_commandLists[index];
+  return m_dxrDevice;
+}
+
+const ComPtr<ID3D12GraphicsCommandList4>& DX12App::getDXRCommandList() const
+{
+  return m_dxrCommandLists[m_swapChainAdapter->getFrameIndex()];
+}
+
+const ComPtr<ID3D12StateObject>& DX12App::getDXRStateObject() const
+{
+  return m_dxrStateObject;
 }
 
 const ComPtr<ID3D12GraphicsCommandList>& DX12App::getCommandList() const
@@ -346,6 +380,11 @@ ComPtr<IDxcBlob> DX12App::compileShader(const std::filesystem::path& shaderFile,
                                         const wchar_t* targetProfile)
 {
   return m_hlslCompiler.compileShader(shaderFile, targetProfile, entryPoint);
+}
+
+void DX12App::setDXRStateObject(CD3DX12_STATE_OBJECT_DESC& stateObjectDescription, ComPtr<ID3D12Device5> device)
+{
+  throwIfFailed(device->CreateStateObject(stateObjectDescription, IID_PPV_ARGS(&m_dxrStateObject)));
 }
 
 void DX12App::onDraw()
@@ -462,7 +501,6 @@ LRESULT DX12App::windowProcHandler(UINT message, WPARAM wParam, LPARAM lParam)
       {
         onResize();
       }
-
     }
     break;
 
