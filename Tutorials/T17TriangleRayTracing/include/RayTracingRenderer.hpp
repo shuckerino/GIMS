@@ -164,10 +164,6 @@ public:
   }
 };
 
-
-
-
-
 class RayTracingRenderer : public DX12App
 {
 public:
