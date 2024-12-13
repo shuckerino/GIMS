@@ -1,4 +1,5 @@
 ﻿#include "RayTracingRenderer.hpp"
+#include <imgui.h>
 
 using namespace gims;
 #if 1
@@ -184,8 +185,6 @@ public:
   }
 };
 
-
-
 } // namespace
 
 // constant shader names
@@ -290,31 +289,13 @@ void RayTracingRenderer::createRayTracingResources()
     m_rayGenCB.stencil = {-1 + border / aspectRatio, -1 + border, 1 - border / aspectRatio, 1.0f - border};
   }
 
-  createRayTracingInterfaces();
   createRootSignatures();
-  createRayTracingPipeline(); // not working yet
-
+  createRayTracingPipeline();
   createGeometry();
   createDescriptorHeap();
   createShaderTables();
   createAccelerationStructures();
   createOutputResource();
-}
-
-/// <summary>
-/// Method for creating ID3D12Device5 and ID3D12GraphicsCommandList4 interfaces
-/// </summary>
-void RayTracingRenderer::createRayTracingInterfaces()
-{
-  // throwIfFailed(
-  //     m_dxrDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_dxrCommandAllocator)));
-  // m_dxrCommandLists.resize(3);
-  // for (ui8 i = 0; i < 3; i++)
-  //{
-  //   throwIfFailed(getCommandListAtIndex(i).As(&m_dxrCommandLists[i]));
-  // }
-
-  std::cout << "Created ID3D12Device5 and ID3D12GraphicsCommandList4 interfaces" << std::endl;
 }
 
 /// <summary>
@@ -393,18 +374,6 @@ void RayTracingRenderer::createRayTracingPipeline()
 
   CD3DX12_STATE_OBJECT_DESC raytracingPipeline {D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE};
 
-  // auto                  lib     = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-  // D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void*)Triangle_cso, ARRAYSIZE(Triangle_cso));
-  // lib->SetDXILLibrary(&libdxil);
-  //  Define which shader exports to surface from the library.
-  //  If no shader exports are defined for a DXIL library subobject, all shaders will be surfaced.
-  //  In this sample, this could be omitted for convenience since the sample uses all shaders in the library.
-  //{
-  //   lib->DefineExport(c_raygenShaderName);
-  //   lib->DefineExport(c_closestHitShaderName);
-  //   lib->DefineExport(c_missShaderName);
-  // }
-
   // DXIL (intermediate language) Library Subobject for RayGen
   auto rayGenLibrary = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
   rayGenLibrary->SetDXILLibrary(&rayGenShaderByteCode);
@@ -451,76 +420,6 @@ void RayTracingRenderer::createRayTracingPipeline()
   setDXRStateObject(raytracingPipeline, getDXRDevice());
 
   std::cout << "Created ray tracing pipeline" << std::endl;
-
-#pragma region Old way of creating pipeline
-
-  //// Ray Generation Shader
-  // D3D12_DXIL_LIBRARY_DESC rayGenLibraryDesc     = {};
-  // rayGenLibraryDesc.DXILLibrary.pShaderBytecode = rayGenShaderByteCode->GetBufferPointer();
-  // rayGenLibraryDesc.DXILLibrary.BytecodeLength  = rayGenShaderByteCode->GetBufferSize();
-  // D3D12_EXPORT_DESC rayGenExportDesc            = {L"MyRaygenShader", nullptr, D3D12_EXPORT_FLAG_NONE};
-  // rayGenLibraryDesc.pExports                    = &rayGenExportDesc;
-  // rayGenLibraryDesc.NumExports                  = 1;
-
-  // D3D12_STATE_SUBOBJECT rayGenShaderObject = {};
-  // rayGenShaderObject.Type                  = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-  // rayGenShaderObject.pDesc                 = &rayGenLibraryDesc;
-
-  //// Miss Shader
-  // D3D12_DXIL_LIBRARY_DESC missLibraryDesc     = {};
-  // missLibraryDesc.DXILLibrary.pShaderBytecode = missShaderByteCode->GetBufferPointer();
-  // missLibraryDesc.DXILLibrary.BytecodeLength  = missShaderByteCode->GetBufferSize();
-  // D3D12_EXPORT_DESC missExportDesc            = {L"MyMissShader", nullptr, D3D12_EXPORT_FLAG_NONE};
-  // missLibraryDesc.pExports                    = &missExportDesc;
-  // missLibraryDesc.NumExports                  = 1;
-
-  // D3D12_STATE_SUBOBJECT missShaderObject = {};
-  // missShaderObject.Type                  = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-  // missShaderObject.pDesc                 = &missLibraryDesc;
-
-  //// Closest Hit Shader
-  // D3D12_DXIL_LIBRARY_DESC hitLibraryDesc     = {};
-  // hitLibraryDesc.DXILLibrary.pShaderBytecode = hitShaderByteCode->GetBufferPointer();
-  // hitLibraryDesc.DXILLibrary.BytecodeLength  = hitShaderByteCode->GetBufferSize();
-  // D3D12_EXPORT_DESC hitExportDesc            = {L"MyClosestHitShader", nullptr, D3D12_EXPORT_FLAG_NONE};
-  // hitLibraryDesc.pExports                    = &hitExportDesc;
-  // hitLibraryDesc.NumExports                  = 1;
-
-  // D3D12_STATE_SUBOBJECT hitShaderObject = {};
-  // hitShaderObject.Type                  = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-  // hitShaderObject.pDesc                 = &hitLibraryDesc;
-
-  //// create local root signatures
-  // D3D12_STATE_SUBOBJECT localRootSigObject = {};
-  // localRootSigObject.Type                  = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
-  // localRootSigObject.pDesc                 = m_rootSignature.Get();
-
-  //// Shader Configuration
-  // D3D12_RAYTRACING_SHADER_CONFIG shaderConfig = {};
-  // shaderConfig.MaxPayloadSizeInBytes          = 32; // Adjust as per your shader's ray payload size
-  // shaderConfig.MaxAttributeSizeInBytes        = 8;  // Typical size for hit attributes
-
-  // D3D12_STATE_SUBOBJECT shaderConfigSubobject = {};
-  // shaderConfigSubobject.Type                  = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
-  // shaderConfigSubobject.pDesc                 = &shaderConfig;
-
-  //// pipeline config
-  // D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig = {};
-  // pipelineConfig.MaxTraceRecursionDepth           = 2; // Number of ray bounces
-  // D3D12_STATE_SUBOBJECT pipelineConfigSubobject   = {};
-  // pipelineConfigSubobject.Type                    = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
-  // pipelineConfigSubobject.pDesc                   = &pipelineConfig;
-
-  // D3D12_STATE_SUBOBJECT subobjects[] = {rayGenShaderObject,    missShaderObject,        hitShaderObject,
-  //                                       shaderConfigSubobject, pipelineConfigSubobject, localRootSigObject};
-
-  // D3D12_STATE_OBJECT_DESC rayTracingPipeline = {};
-  // rayTracingPipeline.Type                    = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-  // rayTracingPipeline.NumSubobjects           = ARRAYSIZE(subobjects);
-  // rayTracingPipeline.pSubobjects             = subobjects;
-
-  // throwIfFailed(getRTDevice()->CreateStateObject(&rayTracingPipeline, IID_PPV_ARGS(&m_rtStateObject)));
-#pragma endregion
 }
 
 void RayTracingRenderer::createShaderTables()
@@ -839,6 +738,10 @@ void RayTracingRenderer::onDraw()
 
 void RayTracingRenderer::onDrawUI()
 {
+  // Implement two render pass?
+  // ImGui::Begin("Information", nullptr, ImGuiWindowFlags_None);
+  // ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
+  // ImGui::End();
 }
 
 void RayTracingRenderer::DoRayTracing()

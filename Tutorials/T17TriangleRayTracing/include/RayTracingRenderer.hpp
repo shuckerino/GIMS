@@ -36,6 +36,11 @@ public:
   /// </summary>
   virtual void onDrawUI();
 
+  /// <summary>
+  /// Adapt to new viewport
+  /// </summary>
+  virtual void onResize();
+
 private:
   // Acceleration structure
   ComPtr<ID3D12Resource> m_topLevelAS;
@@ -91,7 +96,6 @@ private:
   // Init functions
   bool isRayTracingSupported();
   void createRayTracingResources();
-  void createRayTracingInterfaces();
   void createRootSignatures();
   void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
   void createRayTracingPipeline();
@@ -118,5 +122,4 @@ private:
     ComPtr<ID3D12Resource> pInstanceDesc; // Hold the matrices of the instances
   };
 
-  virtual void onResize();
 };
