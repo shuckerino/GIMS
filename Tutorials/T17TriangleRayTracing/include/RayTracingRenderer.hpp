@@ -101,6 +101,10 @@ private:
   void createRayTracingPipeline();
   void createShaderTables();
   void createDescriptorHeap();
+
+  /// <summary>
+  /// Creates the ray tracing output resource (UAV)
+  /// </summary>
   void createOutputResource();
 
   // Geometry functions
@@ -114,6 +118,10 @@ private:
   void AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppResource, D3D12_RESOURCE_STATES initialResourceState,
                          const wchar_t* resourceName);
   void DoRayTracing();
+
+  /// <summary>
+  /// Copies the raytracing output to the actual renderTarget
+  /// </summary>
   void CopyRaytracingOutputToBackbuffer();
   struct AccelerationStructureBuffers
   {

@@ -195,6 +195,7 @@ const wchar_t* RayTracingRenderer::c_missShaderName       = L"MyMissShader";
 
 #pragma region Helper functions
 
+// Check if can be replaced with UploadHelper
 inline void AllocateUploadBuffer(ID3D12Device* pDevice, void* pData, UINT64 datasize, ID3D12Resource** ppResource,
                                  const wchar_t* resourceName = nullptr)
 {
@@ -564,6 +565,24 @@ void RayTracingRenderer::createAccelerationStructures()
   {
     D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
 
+    //D3D12_RESOURCE_DESC desc = {};
+    //desc.Dimension           = D3D12_RESOURCE_DIMENSION_BUFFER;
+    //desc.Alignment           = 0;
+    //desc.Width               = bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes;
+    //desc.Height              = 1;
+    //desc.DepthOrArraySize    = 1;
+    //desc.MipLevels           = 1;
+    //desc.Format              = DXGI_FORMAT_UNKNOWN;
+    //desc.SampleDesc.Count    = 1;
+    //desc.SampleDesc.Quality  = 0;
+    //desc.Layout              = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    //desc.Flags               = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+    //D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+    //UploadHelper bottomLevelUploader(getDevice(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes);
+    //bottomLevelUploader.uploadBuffer(&desc, &m_bottomLevelAS, )
+
     AllocateUAVBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_bottomLevelAS, initialResourceState,
                       L"BottomLevelAccelerationStructure");
     AllocateUAVBuffer(topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_topLevelAS, initialResourceState,
@@ -578,6 +597,17 @@ void RayTracingRenderer::createAccelerationStructures()
   instanceDesc.Transform[2][2]                = 1.0f;
   instanceDesc.InstanceMask                   = 1;
   instanceDesc.AccelerationStructure          = m_bottomLevelAS->GetGPUVirtualAddress();
+
+  // UploadHelper uploadHelper(getDevice(), sizeof(instanceDesc));
+
+  // auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+  // auto bufferDesc           = CD3DX12_RESOURCE_DESC::Buffer(sizeof(instanceDesc));
+  // throwIfFailed(getDevice()->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &bufferDesc,
+  //                                                    D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+  //                                                    IID_PPV_ARGS(&instanceDescs)));
+
+  // uploadHelper.uploadDefaultBuffer(&instanceDesc, instanceDescs, sizeof(instanceDesc), getCommandQueue());
+
   AllocateUploadBuffer(getDevice().Get(), &instanceDesc, sizeof(instanceDesc), &instanceDescs, L"InstanceDescs");
 
   // Bottom Level Acceleration Structure desc
@@ -608,7 +638,7 @@ void RayTracingRenderer::createAccelerationStructures()
   // Build acceleration structure.
   BuildAccelerationStructure(getDXRCommandList().Get());
 
-  // Kick off acceleration structure construction.
+  // Start acceleration structure construction
   getCommandList()->Close(); // needs to be closed before execution
   ID3D12CommandList* commandLists[] = {getCommandList().Get()};
   getCommandQueue()->ExecuteCommandLists(1, commandLists);
@@ -749,10 +779,6 @@ void RayTracingRenderer::DoRayTracing()
   auto commandList      = getCommandList();
   auto commandAllocator = getCommandAllocator(); // Retrieve the command allocator
 
-  // reset ray tracing specific command list
-  // throwIfFailed(m_dxrCommandAllocator->Reset());
-  // throwIfFailed(m_dxrCommandList->Reset(m_dxrCommandAllocator.Get(), nullptr));
-
   auto DispatchRays = [&](auto* commandList, auto* stateObject, auto* dispatchDesc)
   {
     // Since each shader table has only one shader record, the stride is same as the size.
@@ -778,14 +804,9 @@ void RayTracingRenderer::DoRayTracing()
   commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
   commandList->SetComputeRootDescriptorTable(0, m_raytracingOutputResourceUAVGpuDescriptor);
   commandList->SetComputeRootShaderResourceView(1, m_topLevelAS->GetGPUVirtualAddress());
-  DispatchRays(getDXRCommandList().Get(), getDXRStateObject().Get(), &dispatchDesc);
-  // throwIfFailed(m_dxrCommandList->Close());
-  //// Submit the command list
-  // ID3D12CommandList* commandLists[] = {m_dxrCommandList.Get()};
-  // getCommandQueue()->ExecuteCommandLists(_countof(commandLists), commandLists);
+  DispatchRays(getDXRCommandList().Get(), getDXRStateObject().Get(), &dispatchDesc); // pass ray tracing specific command list
 }
 
-// Copy the raytracing output to the backbuffer.
 void RayTracingRenderer::CopyRaytracingOutputToBackbuffer()
 {
   auto commandList  = getCommandList();
