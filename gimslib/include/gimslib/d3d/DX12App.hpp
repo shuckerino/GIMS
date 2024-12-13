@@ -1,6 +1,6 @@
-#pragma once
-#include <D3Dcompiler.h>
+//#pragma once
 #include <d3d12.h>
+#include <D3Dcompiler.h>
 
 #include <d3dx12/d3dx12.h>
 #include <dxcapi.h>
