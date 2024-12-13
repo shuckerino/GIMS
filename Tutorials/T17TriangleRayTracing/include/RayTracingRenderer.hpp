@@ -17,10 +17,10 @@ class RayTracingRenderer : public DX12App
 public:
   RayTracingRenderer(const DX12AppConfig createInfo);
 
-  //struct Vertex
+  // struct Vertex
   //{
-  //  f32v3 position;
-  //};
+  //   f32v3 position;
+  // };
   struct Vertex
   {
     float v1, v2, v3;
@@ -40,6 +40,16 @@ public:
   /// Adapt to new viewport
   /// </summary>
   virtual void onResize();
+
+#pragma region Rasterizing
+
+  ComPtr<ID3D12PipelineState> m_pipelineState;
+  ComPtr<ID3D12RootSignature> m_rootSignature;
+
+  void createRootSignature();
+  void createPipeline();
+
+#pragma endregion
 
 private:
   // Acceleration structure
@@ -87,11 +97,11 @@ private:
   RayGenConstantBuffer m_rayGenCB;
 
   // Geometry
-  typedef UINT16 Index;
-  ui32                     m_vertexBufferSize; //! Vertex buffer size in bytes.
-  ui32                     m_indexBufferSize;  //! Index buffer size in bytes.
-  ComPtr<ID3D12Resource>   m_indexBuffer;
-  ComPtr<ID3D12Resource>   m_vertexBuffer;
+  typedef UINT16         Index;
+  ui32                   m_vertexBufferSize; //! Vertex buffer size in bytes.
+  ui32                   m_indexBufferSize;  //! Index buffer size in bytes.
+  ComPtr<ID3D12Resource> m_indexBuffer;
+  ComPtr<ID3D12Resource> m_vertexBuffer;
 
   // Init functions
   bool isRayTracingSupported();
@@ -129,5 +139,4 @@ private:
     ComPtr<ID3D12Resource> pResult;       // Where the AS is
     ComPtr<ID3D12Resource> pInstanceDesc; // Hold the matrices of the instances
   };
-
 };

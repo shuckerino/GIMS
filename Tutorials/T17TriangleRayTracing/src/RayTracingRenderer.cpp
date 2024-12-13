@@ -240,6 +240,48 @@ void RayTracingRenderer::AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppR
 
 #pragma region Init
 
+#pragma region Rasterizing
+
+void RayTracingRenderer::createRootSignature()
+{
+  CD3DX12_ROOT_SIGNATURE_DESC descRootSignature;
+  descRootSignature.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE);
+
+  ComPtr<ID3DBlob> rootBlob, errorBlob;
+  D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
+
+  getDevice()->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(),
+                                   IID_PPV_ARGS(&m_rootSignature));
+}
+
+void RayTracingRenderer::createPipeline()
+{
+  const auto vertexShader =
+      compileShader(L"../../../Tutorials/T17TriangleRayTracing/Shaders/Triangle.hlsl", L"VS_main", L"vs_6_3");
+
+  const auto pixelShader =
+      compileShader(L"../../../Tutorials/T17TriangleRayTracing/Shaders/Triangle.hlsl", L"PS_main", L"ps_6_8");
+
+  D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+  psoDesc.InputLayout                        = {};
+  psoDesc.pRootSignature                     = m_rootSignature.Get();
+  psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
+  psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
+  psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+  psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+  psoDesc.DepthStencilState.DepthEnable      = FALSE;
+  psoDesc.DepthStencilState.StencilEnable    = FALSE;
+  psoDesc.SampleMask                         = UINT_MAX;
+  psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+  psoDesc.NumRenderTargets                   = 1;
+  psoDesc.SampleDesc.Count                   = 1;
+  psoDesc.RTVFormats[0]                      = getRenderTarget()->GetDesc().Format;
+  psoDesc.DSVFormat                          = getDepthStencil()->GetDesc().Format;
+  throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+}
+
+#pragma endregion
+
 RayTracingRenderer::RayTracingRenderer(const DX12AppConfig createInfo)
     : DX12App(createInfo)
 {
@@ -249,6 +291,9 @@ RayTracingRenderer::RayTracingRenderer(const DX12AppConfig createInfo)
   }
 
   createRayTracingResources();
+
+  createRootSignature();
+  createPipeline();
 
   ComPtr<ID3D12Debug> debugController;
   if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
@@ -291,10 +336,10 @@ void RayTracingRenderer::createRayTracingResources()
   }
 
   createRootSignatures();
-  createRayTracingPipeline();
+  // createRayTracingPipeline();
   createGeometry();
   createDescriptorHeap();
-  createShaderTables();
+  // createShaderTables();
   createAccelerationStructures();
   createOutputResource();
 }
@@ -565,23 +610,23 @@ void RayTracingRenderer::createAccelerationStructures()
   {
     D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
 
-    //D3D12_RESOURCE_DESC desc = {};
-    //desc.Dimension           = D3D12_RESOURCE_DIMENSION_BUFFER;
-    //desc.Alignment           = 0;
-    //desc.Width               = bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes;
-    //desc.Height              = 1;
-    //desc.DepthOrArraySize    = 1;
-    //desc.MipLevels           = 1;
-    //desc.Format              = DXGI_FORMAT_UNKNOWN;
-    //desc.SampleDesc.Count    = 1;
-    //desc.SampleDesc.Quality  = 0;
-    //desc.Layout              = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    //desc.Flags               = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    // D3D12_RESOURCE_DESC desc = {};
+    // desc.Dimension           = D3D12_RESOURCE_DIMENSION_BUFFER;
+    // desc.Alignment           = 0;
+    // desc.Width               = bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes;
+    // desc.Height              = 1;
+    // desc.DepthOrArraySize    = 1;
+    // desc.MipLevels           = 1;
+    // desc.Format              = DXGI_FORMAT_UNKNOWN;
+    // desc.SampleDesc.Count    = 1;
+    // desc.SampleDesc.Quality  = 0;
+    // desc.Layout              = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    // desc.Flags               = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-    //D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    // D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
-    //UploadHelper bottomLevelUploader(getDevice(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes);
-    //bottomLevelUploader.uploadBuffer(&desc, &m_bottomLevelAS, )
+    // UploadHelper bottomLevelUploader(getDevice(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes);
+    // bottomLevelUploader.uploadBuffer(&desc, &m_bottomLevelAS, )
 
     AllocateUAVBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_bottomLevelAS, initialResourceState,
                       L"BottomLevelAccelerationStructure");
@@ -762,8 +807,25 @@ void RayTracingRenderer::createOutputResource()
 void RayTracingRenderer::onDraw()
 {
   // throwIfFailed(m_dxrCommandList->Close());
-  DoRayTracing();
-  CopyRaytracingOutputToBackbuffer();
+  // DoRayTracing();
+  // CopyRaytracingOutputToBackbuffer();
+
+  const auto commandList = getCommandList();
+  const auto rtvHandle   = getRTVHandle();
+  const auto dsvHandle   = getDSVHandle();
+  commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+
+  f32v4 clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+  commandList->ClearRenderTargetView(rtvHandle, &clearColor.x, 0, nullptr);
+  commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+  commandList->RSSetViewports(1, &getViewport());
+  commandList->RSSetScissorRects(1, &getRectScissor());
+
+  commandList->SetPipelineState(m_pipelineState.Get());
+  commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+  commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  commandList->DrawInstanced(3, 1, 0, 0);
 }
 
 void RayTracingRenderer::onDrawUI()
@@ -804,7 +866,8 @@ void RayTracingRenderer::DoRayTracing()
   commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
   commandList->SetComputeRootDescriptorTable(0, m_raytracingOutputResourceUAVGpuDescriptor);
   commandList->SetComputeRootShaderResourceView(1, m_topLevelAS->GetGPUVirtualAddress());
-  DispatchRays(getCommandList().Get(), getDXRStateObject().Get(), &dispatchDesc); // pass ray tracing specific command list
+  DispatchRays(getCommandList().Get(), getDXRStateObject().Get(),
+               &dispatchDesc); // pass ray tracing specific command list
 }
 
 void RayTracingRenderer::CopyRaytracingOutputToBackbuffer()
