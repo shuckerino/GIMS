@@ -65,8 +65,6 @@ private:
   D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
   UINT                        m_raytracingOutputResourceUAVDescriptorHeapIndex;
 
-  ComPtr<ID3D12StateObject> m_rtStateObject;
-
   // Descriptor heap
   ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
   ui32                         m_descriptorsAllocated;
@@ -133,10 +131,5 @@ private:
   /// Copies the raytracing output to the actual renderTarget
   /// </summary>
   void CopyRaytracingOutputToBackbuffer();
-  struct AccelerationStructureBuffers
-  {
-    ComPtr<ID3D12Resource> pScratch;      // Scratch memory for AS builder
-    ComPtr<ID3D12Resource> pResult;       // Where the AS is
-    ComPtr<ID3D12Resource> pInstanceDesc; // Hold the matrices of the instances
-  };
+
 };

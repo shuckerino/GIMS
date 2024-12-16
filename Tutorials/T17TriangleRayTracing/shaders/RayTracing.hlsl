@@ -16,26 +16,36 @@ VertexShaderOutput VS_main(uint i : SV_VertexID)
 
 float4 PS_main(VertexShaderOutput input) : SV_TARGET
 {
+    float3 lightPosition = float3(0, 0, -2);
+    float3 lightColor = float3(1, 1, 1);
+    
+    // Compute light direction and distance
+    float3 lightDir = normalize(lightPosition - input.position.xyz);
+    float lightDistance = length(lightPosition - input.position.xyz);
+    
     RayDesc ray;
- 
-    //ray.Origin = input.position.xyz;
-    ray.Origin = float3(0, 0, -1);
-    ray.TMin = 0.01;
-    ray.Direction = float3(0, 0, 1);
-    ray.TMax = 10000;
+    ray.Origin = input.position.xyz;
+    ray.Direction = lightDir;
+    ray.TMin = 0.001;
+    ray.TMax = lightDistance;
     
     RayQuery < RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES > q;
     q.TraceRayInline(Scene, 0, 0xFF, ray);
     q.Proceed();
     
-    if (q.CommittedStatus() != COMMITTED_TRIANGLE_HIT)
+    float3 color = float3(0.1, 0.1, 0.1); // Ambient light
+    if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT) // hit
     {
-        return float4(1, 0, 0, 1.0f);
+        // Add diffuse lighting
+        float diffuse = max(dot(lightDir, float3(0, 0, 1)), 0.0);
+        color += diffuse * lightColor;
     }
-    else
-    {
-        return float4(0, 0, 0, 1.0f);
-    }
+    //else // miss
+    //{
+    //    return float4(0, 0, 1, 1.0f);
+    //}
+    
+    return float4(color, 1.0);
  
     //return float4(0.0f, 0.8f, 0.0f, 1.0f);
     

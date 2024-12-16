@@ -9,6 +9,14 @@ using Microsoft::WRL::ComPtr;
 namespace gims
 {
 
+struct Vertex
+{
+  gims::f32v3 position;
+  gims::f32v3 normal;
+  gims::f32v2 textureCoordinate;
+  gims::f32v3 tangents;
+};
+
 /// <summary>
 /// A D3D12 GPU triangle mesh.
 /// </summary>
@@ -30,8 +38,8 @@ public:
   /// <param name="commandQueue">Command queue used to copy the data from the GPU to the GPU.</param>
   TriangleMeshD3D12(f32v3 const* const positions, f32v3 const* const normals, f32v3 const* const textureCoordinates,
                     ui32 nVertices, ui32v3 const* const indexBuffer, ui32 nIndices, f32v3 const* const tangents,
-                    ui32 materialIndex,
-                    const ComPtr<ID3D12Device>& device, const ComPtr<ID3D12CommandQueue>& commandQueue);
+                    ui32 materialIndex, const ComPtr<ID3D12Device>& device,
+                    const ComPtr<ID3D12CommandQueue>& commandQueue);
 
   /// <summary>
   /// Adds the commands necessary for rendering this triangle mesh to the provided commandList.
@@ -50,6 +58,9 @@ public:
   /// </summary>
   /// <returns><The material index of the mesh./returns>
   const ui32 getMaterialIndex() const;
+
+  const ComPtr<ID3D12Resource>& getVertexBuffer() const;
+  const ComPtr<ID3D12Resource>& getIndexBuffer() const;
 
   /// <summary>
   /// Returns the input element descriptors required for the pipeline.

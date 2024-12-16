@@ -2,17 +2,6 @@
 #include <d3dx12/d3dx12.h>
 #include <gimslib/d3d/UploadHelper.hpp>
 #include <iostream>
-namespace
-{
-struct Vertex
-{
-  gims::f32v3 position;
-  gims::f32v3 normal;
-  gims::f32v2 textureCoordinate;
-
-  gims::f32v3 tangents;
-};
-} // namespace
 
 namespace gims
 {
@@ -92,6 +81,16 @@ void TriangleMeshD3D12::addToCommandList(const ComPtr<ID3D12GraphicsCommandList>
   // test for assignment 2
   commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   commandList->DrawIndexedInstanced(m_nIndices, 1, 0, 0, 0);
+}
+
+const ComPtr<ID3D12Resource>& TriangleMeshD3D12::getVertexBuffer() const
+{
+  return m_vertexBuffer;
+}
+
+const ComPtr<ID3D12Resource>& TriangleMeshD3D12::getIndexBuffer() const
+{
+  return m_indexBuffer;
 }
 
 const AABB TriangleMeshD3D12::getAABB() const

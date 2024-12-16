@@ -1,4 +1,5 @@
 #include "SceneGraphViewerApp.hpp"
+#include "RayTracingUtils.hpp"
 #include "SceneFactory.hpp"
 #include <d3dx12/d3dx12.h>
 #include <gimslib/contrib/stb/stb_image.h>
@@ -22,6 +23,9 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
   createRootSignature();
   createSceneConstantBuffer();
   createPipeline();
+
+  RayTracingUtils::createRayTracingUtils(getDevice(), m_scene, getCommandList(), getCommandAllocator(),
+                                         getCommandQueue(), getHeight(), getWidth(), (*this));
 }
 
 #pragma region Init
@@ -30,10 +34,10 @@ void SceneGraphViewerApp::createRootSignature()
 {
   CD3DX12_ROOT_PARAMETER   rootParameter[4] = {};
   CD3DX12_DESCRIPTOR_RANGE range            = {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0};
-  rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL); // scene constant buffer
-  rootParameter[1].InitAsConstants(16, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE); // mv matrix
+  rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);   // scene constant buffer
+  rootParameter[1].InitAsConstants(16, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE);        // mv matrix
   rootParameter[2].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_PIXEL); // materials
-  rootParameter[3].InitAsDescriptorTable(1, &range); // textures
+  rootParameter[3].InitAsDescriptorTable(1, &range);                              // textures
 
   D3D12_STATIC_SAMPLER_DESC sampler = {};
   sampler.Filter                    = D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -197,7 +201,7 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
 {
   SceneConstantBuffer cb;
   cb.lightDirection = m_uiData.m_lightDirection;
-  cb.flags = m_uiData.m_useNormalMapping & 0x1;
+  cb.flags          = m_uiData.m_useNormalMapping & 0x1;
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
   // std::cout << "Projection is " << glm::to_string(cb.projectionMatrix) << std::endl;

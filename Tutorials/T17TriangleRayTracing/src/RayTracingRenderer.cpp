@@ -257,14 +257,14 @@ void RayTracingRenderer::createRootSignature()
 void RayTracingRenderer::createPipeline()
 {
   const auto vertexShader =
-      compileShader(L"../../../Tutorials/T17TriangleRayTracing/Shaders/Triangle.hlsl", L"VS_main", L"vs_6_3");
+      compileShader(L"../../../Tutorials/T17TriangleRayTracing/Shaders/RayTracing.hlsl", L"VS_main", L"vs_6_3");
 
   const auto pixelShader =
-      compileShader(L"../../../Tutorials/T17TriangleRayTracing/Shaders/Triangle.hlsl", L"PS_main", L"ps_6_8");
+      compileShader(L"../../../Tutorials/T17TriangleRayTracing/Shaders/RayTracing.hlsl", L"PS_main", L"ps_6_8");
 
   D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
   psoDesc.InputLayout                        = {};
-  psoDesc.pRootSignature                     = m_rootSignature.Get();
+  psoDesc.pRootSignature                     = m_globalRootSignature.Get();
   psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
   psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
   psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -292,7 +292,7 @@ RayTracingRenderer::RayTracingRenderer(const DX12AppConfig createInfo)
 
   createRayTracingResources();
 
-  createRootSignature();
+  //createRootSignature();
   createPipeline();
 
   ComPtr<ID3D12Debug> debugController;
@@ -351,13 +351,12 @@ void RayTracingRenderer::createRootSignatures()
 {
   // First we create global root signature (shared across all shaders)
   {
-    CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
-    UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-    CD3DX12_ROOT_PARAMETER rootParameters[2];
-    rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
-    rootParameters[1].InitAsShaderResourceView(0);
+    //CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
+    //UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+    CD3DX12_ROOT_PARAMETER rootParameters[1];
+    //rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
+    rootParameters[0].InitAsShaderResourceView(0);
     CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
-    // SerializeAndCreateRaytracingRootSignature(globalRootSignatureDesc, &m_globalRootSignature);
     ComPtr<ID3DBlob> rootBlob, errorBlob;
     D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
 
@@ -368,7 +367,7 @@ void RayTracingRenderer::createRootSignatures()
   }
 
   // Then we create local root signatures for each shader
-  {
+  /*{
     CD3DX12_ROOT_PARAMETER rootParameters[1];
     rootParameters[0].InitAsConstants(SizeOfInUint32(m_rayGenCB), 0, 0);
     CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
@@ -379,7 +378,7 @@ void RayTracingRenderer::createRootSignatures()
                                      IID_PPV_ARGS(&m_LocalRootSignature));
 
     std::cout << "Created local root signature" << std::endl;
-  }
+  }*/
 }
 
 // Local root signature and shader association
@@ -823,7 +822,7 @@ void RayTracingRenderer::onDraw()
   commandList->RSSetScissorRects(1, &getRectScissor());
 
   commandList->SetPipelineState(m_pipelineState.Get());
-  commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+  commandList->SetGraphicsRootSignature(m_globalRootSignature.Get());
   commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   commandList->DrawInstanced(3, 1, 0, 0);
 }
