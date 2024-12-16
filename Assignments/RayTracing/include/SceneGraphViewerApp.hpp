@@ -52,7 +52,7 @@ private:
   struct UiData
   {
     f32v3 m_backgroundColor = f32v3(0.25f, 0.25f, 0.25f);
-    f32v3 m_lightDirection = f32v3(0.0f, 0.0f, -1.0f);
+    f32v3 m_lightDirection  = f32v3(0.0f, 0.0f, -1.0f);
     bool  m_useNormalMapping;
   };
 
@@ -62,4 +62,5 @@ private:
   gims::ExaminerController         m_examinerController;
   Scene                            m_scene;
   UiData                           m_uiData;
+  //RayTracingUtils                  m_rayTracingUtils;
 };

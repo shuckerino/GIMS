@@ -25,19 +25,21 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
   createPipeline();
 
   RayTracingUtils::createRayTracingUtils(getDevice(), m_scene, getCommandList(), getCommandAllocator(),
-                                         getCommandQueue(), getHeight(), getWidth(), (*this));
+                                             getCommandQueue(), getHeight(), getWidth(), (*this));
 }
 
 #pragma region Init
 
 void SceneGraphViewerApp::createRootSignature()
 {
-  CD3DX12_ROOT_PARAMETER   rootParameter[4] = {};
+  CD3DX12_ROOT_PARAMETER   rootParameter[5] = {};
   CD3DX12_DESCRIPTOR_RANGE range            = {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0};
   rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);   // scene constant buffer
   rootParameter[1].InitAsConstants(16, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE);        // mv matrix
   rootParameter[2].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_PIXEL); // materials
   rootParameter[3].InitAsDescriptorTable(1, &range);                              // textures
+  // Add a new root parameter for the TLAS
+  rootParameter[4].InitAsShaderResourceView(5, 0, D3D12_SHADER_VISIBILITY_ALL); // TLAS bound to t3, space0
 
   D3D12_STATIC_SAMPLER_DESC sampler = {};
   sampler.Filter                    = D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -71,9 +73,9 @@ void SceneGraphViewerApp::createPipeline()
   const auto inputElementDescs = TriangleMeshD3D12::getInputElementDescriptors();
 
   const auto vertexShader =
-      compileShader(L"../../../Assignments/A1SceneGraphViewer/Shaders/TriangleMesh.hlsl", L"VS_main", L"vs_6_0");
+      compileShader(L"../../../Assignments/RayTracing/Shaders/TriangleMesh.hlsl", L"VS_main", L"vs_6_8");
   const auto pixelShader =
-      compileShader(L"../../../Assignments/A1SceneGraphViewer/Shaders/TriangleMesh.hlsl", L"PS_main", L"ps_6_0");
+      compileShader(L"../../../Assignments/RayTracing/Shaders/TriangleMesh.hlsl", L"PS_main", L"ps_6_8");
 
   D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
   psoDesc.InputLayout                        = {inputElementDescs.data(), (ui32)inputElementDescs.size()};
