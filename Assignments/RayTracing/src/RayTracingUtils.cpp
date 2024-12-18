@@ -1,4 +1,5 @@
 ﻿#include "RayTracingUtils.hpp"
+#include "SceneGraphViewerApp.hpp" // Full definition needed here
 
 namespace
 {

@@ -3,6 +3,7 @@
 #include <gimslib/d3d/DX12App.hpp>
 #include <gimslib/types.hpp>
 #include <gimslib/ui/ExaminerController.hpp>
+#include "RayTracingUtils.hpp"
 using namespace gims;
 
 /// <summary>
@@ -33,7 +34,7 @@ private:
   /// <summary>
   /// Root signature connecting shader and GPU resources.
   /// </summary>
-  void createRootSignature();
+  void createRootSignatures();
 
   /// <summary>
   /// Creates the pipeline
@@ -57,10 +58,11 @@ private:
   };
 
   ComPtr<ID3D12PipelineState>      m_pipelineState;
-  ComPtr<ID3D12RootSignature>      m_rootSignature;
+  ComPtr<ID3D12RootSignature>      m_graphicsRootSignature;
+  ComPtr<ID3D12RootSignature>      m_computeRootSignature;
   std::vector<ConstantBufferD3D12> constantBuffers;
   gims::ExaminerController         m_examinerController;
   Scene                            m_scene;
   UiData                           m_uiData;
-  //RayTracingUtils                  m_rayTracingUtils;
+  RayTracingUtils                  m_rayTracingUtils;
 };

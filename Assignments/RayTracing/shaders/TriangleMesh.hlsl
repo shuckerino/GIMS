@@ -36,15 +36,15 @@ cbuffer Material : register(b2)
     float4 specularColorAndExponent;
 }
 
-Texture2D<float4> g_textureAmbient : register(t0);
-Texture2D<float4> g_textureDiffuse : register(t1);
-Texture2D<float4> g_textureSpecular : register(t2);
-Texture2D<float4> g_textureEmissive : register(t3);
-Texture2D<float4> g_textureNormal : register(t4);
+//Texture2D<float4> g_textureAmbient : register(t0);
+//Texture2D<float4> g_textureDiffuse : register(t1);
+//Texture2D<float4> g_textureSpecular : register(t2);
+//Texture2D<float4> g_textureEmissive : register(t3);
+//Texture2D<float4> g_textureNormal : register(t4);
 
-SamplerState g_sampler : register(s0);
+//SamplerState g_sampler : register(s0);
 
-RaytracingAccelerationStructure TLAS : register(t5, space0); // Acceleration structure
+RaytracingAccelerationStructure TLAS : register(t0, space0); // Acceleration structure
 
 
 VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, float3 tangent : TANGENT, float2 texCoord : TEXCOORD)
@@ -57,7 +57,7 @@ VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, f
     output.clipSpacePosition = mul(projectionMatrix, p4);
     output.texCoord = texCoord;
 
-    output.viewSpaceTangent = mul((float3x3)modelViewMatrix, tangent);
+    output.viewSpaceTangent = mul((float3x3) modelViewMatrix, tangent);
     output.viewSpaceBitangent = cross(output.viewSpaceNormal, output.viewSpaceTangent);
     return output;
 }
@@ -80,19 +80,25 @@ float4 PS_main(VertexShaderOutput input)
     
     RayQuery < RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES > q;
     q.TraceRayInline(TLAS, 0, 0xFF, ray);
-    q.Proceed();
-    
     float3 color = float3(0.1, 0.1, 0.1); // Ambient light
-    if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT) // hit
+    
+    while (q.Proceed())
     {
-        // Add diffuse lighting
-        float diffuse = max(dot(lightDir, float3(0, 0, 1)), 0.0);
-        color += diffuse * lightColor;
+        if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+        {
+                    // Get the hit attributes
+            //float3 hitPosition = q.CommittedPosition();
+            //float3 hitNormal = normalize(q.CommittedNormal());
+    
+        // Calculate diffuse lighting
+            float diffuse = max(dot(input.viewSpaceNormal, lightDir), 0.0);
+            color += diffuse * lightColor;
+        }
+        else // miss
+        {
+            color = float3(0.1, 0.1, 0.1); // Ambient light
+        }
     }
-    //else // miss
-    //{
-    //    return float4(0, 0, 1, 1.0f);
-    //}
     
     return float4(color, 1.0);
     //return float4(1.0f, 0.0f, 0.0f, 1.0f);

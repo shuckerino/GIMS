@@ -11,7 +11,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <SceneGraphViewerApp.hpp>
+
+class SceneGraphViewerApp; // Forward declaration
 
 class RayTracingUtils
 {
@@ -22,10 +23,9 @@ public:
   static RayTracingUtils createRayTracingUtils(ComPtr<ID3D12Device5> device, Scene& scene,
                                                ComPtr<ID3D12GraphicsCommandList4> commandList,
                                                ComPtr<ID3D12CommandAllocator>     commandAllocator,
-                                               ComPtr<ID3D12CommandQueue> commandQueue,
-                                               ui32 vp_height, ui32 vp_width, SceneGraphViewerApp& app);
+                                               ComPtr<ID3D12CommandQueue> commandQueue, ui32 vp_height, ui32 vp_width,
+                                               SceneGraphViewerApp& app);
 
-private:
   // Acceleration structure
   ComPtr<ID3D12Resource> m_topLevelAS;
   ComPtr<ID3D12Resource> m_bottomLevelAS;

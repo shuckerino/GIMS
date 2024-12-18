@@ -17,29 +17,30 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
     : DX12App(config)
     , m_examinerController(true)
     , m_scene(SceneGraphFactory::createFromAssImpScene(pathToScene, getDevice(), getCommandQueue()))
+    , m_rayTracingUtils(RayTracingUtils::createRayTracingUtils(getDevice(), m_scene, getCommandList(),
+                                                               getCommandAllocator(), getCommandQueue(), getHeight(),
+                                                               getWidth(), (*this)))
 {
   m_examinerController.setTranslationVector(f32v3(0, -0.25f, 1.5));
   m_uiData.m_useNormalMapping = false;
-  createRootSignature();
+  createRootSignatures();
   createSceneConstantBuffer();
   createPipeline();
-
-  RayTracingUtils::createRayTracingUtils(getDevice(), m_scene, getCommandList(), getCommandAllocator(),
-                                             getCommandQueue(), getHeight(), getWidth(), (*this));
 }
 
 #pragma region Init
 
-void SceneGraphViewerApp::createRootSignature()
+void SceneGraphViewerApp::createRootSignatures()
 {
-  CD3DX12_ROOT_PARAMETER   rootParameter[5] = {};
-  CD3DX12_DESCRIPTOR_RANGE range            = {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0};
+
+  // graphics root signature
+  CD3DX12_ROOT_PARAMETER rootParameter[3] = {};
+  // CD3DX12_DESCRIPTOR_RANGE range            = {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0};
   rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);   // scene constant buffer
   rootParameter[1].InitAsConstants(16, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE);        // mv matrix
   rootParameter[2].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_PIXEL); // materials
-  rootParameter[3].InitAsDescriptorTable(1, &range);                              // textures
-  // Add a new root parameter for the TLAS
-  rootParameter[4].InitAsShaderResourceView(5, 0, D3D12_SHADER_VISIBILITY_ALL); // TLAS bound to t3, space0
+  // rootParameter[3].InitAsDescriptorTable(1, &range);                              // textures
+  //  Add a new root parameter for the TLAS
 
   D3D12_STATIC_SAMPLER_DESC sampler = {};
   sampler.Filter                    = D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -57,14 +58,29 @@ void SceneGraphViewerApp::createRootSignature()
   sampler.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
 
   CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-  rootSignatureDesc.Init(_countof(rootParameter), rootParameter, 1, &sampler,
+  rootSignatureDesc.Init(_countof(rootParameter), rootParameter, 0, nullptr,
                          D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
   ComPtr<ID3DBlob> rootBlob, errorBlob;
   D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
 
   getDevice()->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(),
-                                   IID_PPV_ARGS(&m_rootSignature));
+                                   IID_PPV_ARGS(&m_graphicsRootSignature));
+
+
+  // compute root signature
+  CD3DX12_ROOT_PARAMETER rayTracingRootParameter[1] = {};
+  rayTracingRootParameter[0].InitAsShaderResourceView(0); // TLAS bound to t3, space0
+
+  CD3DX12_ROOT_SIGNATURE_DESC rayTracingRootSignatureDesc = {};
+  rayTracingRootSignatureDesc.Init(_countof(rayTracingRootParameter), rayTracingRootParameter, 0, nullptr,
+                         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+  D3D12SerializeRootSignature(&rayTracingRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
+
+  getDevice()->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(),
+                                   IID_PPV_ARGS(&m_computeRootSignature));
+
 }
 
 void SceneGraphViewerApp::createPipeline()
@@ -79,7 +95,7 @@ void SceneGraphViewerApp::createPipeline()
 
   D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
   psoDesc.InputLayout                        = {inputElementDescs.data(), (ui32)inputElementDescs.size()};
-  psoDesc.pRootSignature                     = m_rootSignature.Get();
+  psoDesc.pRootSignature                     = m_graphicsRootSignature.Get();
   psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
   psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
   psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -164,11 +180,16 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
 
   cmdLst->SetPipelineState(m_pipelineState.Get());
 
-  cmdLst->SetGraphicsRootSignature(m_rootSignature.Get());
+  cmdLst->SetGraphicsRootSignature(m_graphicsRootSignature.Get());
 
   // set constant buffer
   const auto sceneCb = constantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
   cmdLst->SetGraphicsRootConstantBufferView(0, sceneCb);
+
+  // ray tracing
+  cmdLst->SetComputeRootSignature(m_computeRootSignature.Get());
+  cmdLst->SetDescriptorHeaps(1, m_rayTracingUtils.m_descriptorHeap.GetAddressOf());
+  cmdLst->SetComputeRootShaderResourceView(0, m_rayTracingUtils.m_topLevelAS->GetGPUVirtualAddress());
 
   m_scene.addToCommandList(cmdLst, cameraAndNormalization, 1, 2, 3);
 }

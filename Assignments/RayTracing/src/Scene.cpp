@@ -29,7 +29,7 @@ void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuTransformation,
         2, meshMaterial.materialConstantBuffer.getResource()->GetGPUVirtualAddress());
     
     commandList->SetDescriptorHeaps(1, meshMaterial.srvDescriptorHeap.GetAddressOf());
-    commandList->SetGraphicsRootDescriptorTable(3, meshMaterial.srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+    //commandList->SetGraphicsRootDescriptorTable(3, meshMaterial.srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
     
     // draw call
     meshToDraw.addToCommandList(commandList);
