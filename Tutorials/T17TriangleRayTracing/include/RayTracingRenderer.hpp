@@ -58,41 +58,6 @@ private:
 
   // Root signatures
   ComPtr<ID3D12RootSignature> m_globalRootSignature;
-  ComPtr<ID3D12RootSignature> m_LocalRootSignature;
-
-  // Ray tracing output
-  ComPtr<ID3D12Resource>      m_raytracingOutput;
-  D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
-  UINT                        m_raytracingOutputResourceUAVDescriptorHeapIndex;
-
-  // Descriptor heap
-  ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
-  ui32                         m_descriptorsAllocated;
-  ui32                         m_descriptorSize;
-
-  // Shader tables
-  static const wchar_t*  c_hitGroupName;
-  static const wchar_t*  c_raygenShaderName;
-  static const wchar_t*  c_closestHitShaderName;
-  static const wchar_t*  c_missShaderName;
-  ComPtr<ID3D12Resource> m_missShaderTable;
-  ComPtr<ID3D12Resource> m_hitGroupShaderTable;
-  ComPtr<ID3D12Resource> m_rayGenShaderTable;
-
-  // Raytracing scene
-  struct Viewport
-  {
-    float left;
-    float top;
-    float right;
-    float bottom;
-  };
-  struct RayGenConstantBuffer
-  {
-    Viewport viewport;
-    Viewport stencil;
-  };
-  RayGenConstantBuffer m_rayGenCB;
 
   // Geometry
   typedef UINT16         Index;
@@ -105,16 +70,7 @@ private:
   bool isRayTracingSupported();
   void createRayTracingResources();
   void createRootSignatures();
-  void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
-  void createRayTracingPipeline();
-  void createShaderTables();
-  void createDescriptorHeap();
-
-  /// <summary>
-  /// Creates the ray tracing output resource (UAV)
-  /// </summary>
-  void createOutputResource();
-
+ 
   // Geometry functions
   void createGeometry();
 
@@ -125,11 +81,5 @@ private:
   // Helper functions
   void AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppResource, D3D12_RESOURCE_STATES initialResourceState,
                          const wchar_t* resourceName);
-  void DoRayTracing();
-
-  /// <summary>
-  /// Copies the raytracing output to the actual renderTarget
-  /// </summary>
-  void CopyRaytracingOutputToBackbuffer();
-
+ 
 };
