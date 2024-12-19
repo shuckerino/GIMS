@@ -59,7 +59,7 @@ private:
 
   ComPtr<ID3D12PipelineState>      m_pipelineState;
   ComPtr<ID3D12RootSignature>      m_graphicsRootSignature;
-  ComPtr<ID3D12RootSignature>      m_computeRootSignature;
+  //ComPtr<ID3D12RootSignature>      m_computeRootSignature;
   std::vector<ConstantBufferD3D12> constantBuffers;
   gims::ExaminerController         m_examinerController;
   Scene                            m_scene;

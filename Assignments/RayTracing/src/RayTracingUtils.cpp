@@ -90,7 +90,9 @@ RayTracingUtils RayTracingUtils::createRayTracingUtils(ComPtr<ID3D12Device5> dev
   RayTracingUtils rayTracingUtils(device);
 
   rayTracingUtils.createDescriptorHeap(device);
-  rayTracingUtils.createOutputResource(device, vp_width, vp_height);
+  //rayTracingUtils.createOutputResource(device, vp_width, vp_height);
+  (void)vp_height;
+  (void)vp_width;
   rayTracingUtils.createAccelerationStructures(device, scene, commandList, commandAllocator, commandQueue, app);
 
   return rayTracingUtils;
