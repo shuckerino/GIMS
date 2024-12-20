@@ -84,6 +84,12 @@ public:
   const ui32 getNumberOfNodes() const;
 
   /// <summary>
+  /// Returns the total number of nodes.
+  /// </summary>
+  /// <returns></returns>
+  const ui32 getNumberOfMeshes() const;
+
+  /// <summary>
   /// Triangle meshes are stored in a 1D array. This functions returns the TriangleMeshD3D12 at the respective index.
   /// </summary>
   /// <param name="materialIdx">Index of the mesh.</param>
@@ -106,8 +112,8 @@ public:
   /// constant buffer.</param>
   /// <param name="srvRootParameterIdx">In your root signature the paramer index of the Shader-Resource-View For the
   /// textures.</param>
-  void addToCommandList(const ComPtr<ID3D12GraphicsCommandList>& commandList, const f32m4 modelView, const f32m4 modelMatrix,
-                        ui32 modelViewRootParameterIdx, ui32 materialConstantsRootParameterIdx,
+  void addToCommandList(const ComPtr<ID3D12GraphicsCommandList>& commandList, const f32m4 modelView,
+                        const f32m4 modelMatrix, ui32 modelViewRootParameterIdx, ui32 materialConstantsRootParameterIdx,
                         ui32 srvRootParameterIdx);
 
   // Allow the class SceneGraphFactor access to the private members.

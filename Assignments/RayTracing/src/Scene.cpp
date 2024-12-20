@@ -61,6 +61,11 @@ const ui32 Scene::getNumberOfNodes() const
   return static_cast<ui32>(m_nodes.size());
 }
 
+const ui32 Scene::getNumberOfMeshes() const
+{
+  return static_cast<ui32>(m_meshes.size());
+}
+
 const TriangleMeshD3D12& Scene::getMesh(ui32 meshIdx) const
 {
   return m_meshes[meshIdx];
