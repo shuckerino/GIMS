@@ -1,9 +1,9 @@
 #pragma once
+#include "RayTracingUtils.hpp"
 #include "Scene.hpp"
 #include <gimslib/d3d/DX12App.hpp>
 #include <gimslib/types.hpp>
 #include <gimslib/ui/ExaminerController.hpp>
-#include "RayTracingUtils.hpp"
 using namespace gims;
 
 /// <summary>
@@ -53,13 +53,12 @@ private:
   struct UiData
   {
     f32v3 m_backgroundColor = f32v3(0.25f, 0.25f, 0.25f);
-    f32v2 m_lightAngles = f32v2(50.0f, 80.0f);
-    bool  m_useNormalMapping;
+    f32v2 m_lightAngles     = f32v2(0.0f, 0.0f);
+    bool  m_useRayTracing;
   };
 
   ComPtr<ID3D12PipelineState>      m_pipelineState;
   ComPtr<ID3D12RootSignature>      m_graphicsRootSignature;
-  //ComPtr<ID3D12RootSignature>      m_computeRootSignature;
   std::vector<ConstantBufferD3D12> constantBuffers;
   gims::ExaminerController         m_examinerController;
   Scene                            m_scene;

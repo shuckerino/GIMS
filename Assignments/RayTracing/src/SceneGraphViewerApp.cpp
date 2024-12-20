@@ -22,7 +22,7 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
                                                                getWidth(), (*this)))
 {
   m_examinerController.setTranslationVector(f32v3(0, -0.25f, 1.5));
-  m_uiData.m_useNormalMapping = false;
+  m_uiData.m_useRayTracing = false;
   createRootSignatures();
   createSceneConstantBuffer();
   createPipeline();
@@ -65,19 +65,6 @@ void SceneGraphViewerApp::createRootSignatures()
 
   getDevice()->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(),
                                    IID_PPV_ARGS(&m_graphicsRootSignature));
-
-  //// compute root signature
-  // CD3DX12_ROOT_PARAMETER rayTracingRootParameter[1] = {};
-  // rayTracingRootParameter[0].InitAsShaderResourceView(0); // TLAS bound to t3, space0
-
-  // CD3DX12_ROOT_SIGNATURE_DESC rayTracingRootSignatureDesc = {};
-  // rayTracingRootSignatureDesc.Init(_countof(rayTracingRootParameter), rayTracingRootParameter, 0, nullptr,
-  //                        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-  // D3D12SerializeRootSignature(&rayTracingRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
-
-  // getDevice()->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(),
-  //                                  IID_PPV_ARGS(&m_computeRootSignature));
 }
 
 void SceneGraphViewerApp::createPipeline()
@@ -160,7 +147,7 @@ void SceneGraphViewerApp::onDrawUI()
   ImGui::End();
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
-  ImGui::Checkbox("Use normal mapping (not really working)", &m_uiData.m_useNormalMapping);
+  ImGui::Checkbox("Use ray tracing", &m_uiData.m_useRayTracing);
   ImGui::SliderFloat("Light angle phi", &m_uiData.m_lightAngles.x, 0.0f, 180.0f);
   ImGui::SliderFloat("Light angle theta", &m_uiData.m_lightAngles.y, 0.0f, 360.0f);
   
@@ -226,7 +213,7 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
   const auto sy = sin(glm::radians(m_uiData.m_lightAngles.y));
 
   cb.lightDirection = f32v3(sx * cy, sx * sy, cx);
-  cb.flags          = m_uiData.m_useNormalMapping & 0x1;
+  cb.flags          = m_uiData.m_useRayTracing & 0x1;
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
   // std::cout << "Projection is " << glm::to_string(cb.projectionMatrix) << std::endl;

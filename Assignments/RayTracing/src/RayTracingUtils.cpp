@@ -185,24 +185,6 @@ void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device,
   {
     D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
 
-    // D3D12_RESOURCE_DESC desc = {};
-    // desc.Dimension           = D3D12_RESOURCE_DIMENSION_BUFFER;
-    // desc.Alignment           = 0;
-    // desc.Width               = bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes;
-    // desc.Height              = 1;
-    // desc.DepthOrArraySize    = 1;
-    // desc.MipLevels           = 1;
-    // desc.Format              = DXGI_FORMAT_UNKNOWN;
-    // desc.SampleDesc.Count    = 1;
-    // desc.SampleDesc.Quality  = 0;
-    // desc.Layout              = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    // desc.Flags               = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-    // D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-
-    // UploadHelper bottomLevelUploader(getDevice(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes);
-    // bottomLevelUploader.uploadBuffer(&desc, &m_bottomLevelAS, )
-
     AllocateUAVBuffer(device, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_bottomLevelAS, initialResourceState,
                       L"BottomLevelAccelerationStructure");
     AllocateUAVBuffer(device, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_topLevelAS, initialResourceState,
