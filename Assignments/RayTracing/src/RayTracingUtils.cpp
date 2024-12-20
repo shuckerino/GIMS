@@ -89,7 +89,6 @@ RayTracingUtils RayTracingUtils::createRayTracingUtils(ComPtr<ID3D12Device5> dev
 {
   RayTracingUtils rayTracingUtils(device);
 
-  rayTracingUtils.createDescriptorHeap(device);
   //rayTracingUtils.createOutputResource(device, vp_width, vp_height);
   (void)vp_height;
   (void)vp_width;
@@ -120,47 +119,6 @@ bool RayTracingUtils::isRayTracingSupported(ComPtr<ID3D12Device5> device)
     std::cout << "Ray tracing supported on your device" << std::endl;
     return true;
   }
-}
-
-void RayTracingUtils::createDescriptorHeap(ComPtr<ID3D12Device5> device)
-{
-  D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc = {};
-  // Allocate a heap for a single descriptor:
-  // 1 - raytracing output texture UAV
-  descriptorHeapDesc.NumDescriptors = 1;
-  descriptorHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-  descriptorHeapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-  descriptorHeapDesc.NodeMask       = 0;
-  device->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&m_descriptorHeap));
-  NAME_D3D12_OBJECT(m_descriptorHeap);
-
-  m_descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-}
-
-void RayTracingUtils::createOutputResource(ComPtr<ID3D12Device5> device, ui32 width, ui32 height)
-{
-  D3D12_RESOURCE_DESC resourceDesc = {};
-  resourceDesc.DepthOrArraySize    = 1;
-  resourceDesc.Dimension           = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-  resourceDesc.Flags               = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-  resourceDesc.Format              = DXGI_FORMAT_R8G8B8A8_UNORM;
-  resourceDesc.Width               = width;
-  resourceDesc.Height              = height;
-  resourceDesc.Layout              = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-  resourceDesc.MipLevels           = 1;
-  resourceDesc.SampleDesc.Count    = 1;
-
-  const auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-  device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc,
-                                  D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput));
-  NAME_D3D12_OBJECT(m_raytracingOutput);
-
-  D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-  uavDesc.Format                           = DXGI_FORMAT_R8G8B8A8_UNORM;
-  uavDesc.ViewDimension                    = D3D12_UAV_DIMENSION_TEXTURE2D;
-  device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &uavDesc,
-                                    m_descriptorHeap->GetCPUDescriptorHandleForHeapStart());
-  m_raytracingOutputResourceUAVGpuDescriptor = m_descriptorHeap->GetGPUDescriptorHandleForHeapStart();
 }
 
 void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device, Scene& scene,

@@ -80,19 +80,22 @@ float4 PS_main(VertexShaderOutput input)
     ray.TMin = 0.001;
     ray.TMax = lightDistance;
     
-    RayQuery < RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES > q;
+    RayQuery <RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> q;
     q.TraceRayInline(TLAS, 0, 0xFF, ray);
     float3 finalColor = float3(0.0, 0.0, 0.0); // Initialize output color
     bool hit = false;
+    float3 hitPosition = float3(0.0f, 0.0f, 0.0f);
     
-    while (q.Proceed())
-    {
+    // traverse TLAS
+    q.Proceed();
+    //while (q.Proceed())
+    //{
 
-    }
+    //}
     
     if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
-            // A triangle was hit
+        // A triangle was hit
         hit = true;
         q.CommitNonOpaqueTriangleHit();
     }
@@ -100,13 +103,14 @@ float4 PS_main(VertexShaderOutput input)
     // Shade the pixel based on ray result
     if (hit)
     {
-        // In shadow: darker color
-        finalColor = float4(0.2, 0.2, 0.2, 1.0); // Example: dark gray
+        hitPosition = ray.Origin + ray.Direction * q.CommittedRayT(); // CommitedRayT returns current TMax where hit was noticed
+        // static color when in shadow
+        finalColor = float4(0.2, 0.2, 0.2, 1.0);
     }
     else
     {
-        // Not in shadow: normal color
-        float3 normalColor = float4(1.0, 0.0, 0.0, 1.0); // Example: use normal as color
+        // red for in lighting
+        float3 normalColor = float4(1.0, 0.0, 0.0, 1.0);
         finalColor = float4(normalColor, 1.0);
     }
 
