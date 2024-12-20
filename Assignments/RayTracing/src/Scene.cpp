@@ -29,7 +29,7 @@ void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuTransformation,
         2, meshMaterial.materialConstantBuffer.getResource()->GetGPUVirtualAddress());
     
     commandList->SetDescriptorHeaps(1, meshMaterial.srvDescriptorHeap.GetAddressOf());
-    //commandList->SetGraphicsRootDescriptorTable(3, meshMaterial.srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+    commandList->SetGraphicsRootDescriptorTable(3, meshMaterial.srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
     
     // draw call
     meshToDraw.addToCommandList(commandList);
@@ -37,7 +37,8 @@ void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuTransformation,
 
   for (ui32 c = 0; c < (ui32)currentNode.childIndices.size(); c++)
   {
-    addToCommandListImpl(scene, currentNode.childIndices[c], accuTransformation, commandList, modelViewRootParameterIdx,
+    addToCommandListImpl(scene, currentNode.childIndices[c], accuTransformation, commandList,
+                         modelViewRootParameterIdx,
                          materialConstantsRootParameterIdx, srvRootParameterIdx);
   }
 }
@@ -78,7 +79,7 @@ void Scene::addToCommandList(const ComPtr<ID3D12GraphicsCommandList>& commandLis
                              ui32 modelViewRootParameterIdx, ui32 materialConstantsRootParameterIdx,
                              ui32 srvRootParameterIdx)
 {
-  addToCommandListImpl(*this, 0, transformation, commandList, modelViewRootParameterIdx,
+  addToCommandListImpl(*this, 0,transformation, commandList, modelViewRootParameterIdx,
                        materialConstantsRootParameterIdx, srvRootParameterIdx);
 }
 } // namespace gims

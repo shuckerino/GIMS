@@ -1,7 +1,8 @@
 struct VertexShaderOutput
 {
     float4 clipSpacePosition : SV_POSITION;
-    float3 viewSpacePosition : POSITION;
+    float3 viewSpacePosition : POSITION0;
+    float3 objectSpacePosition : POSITION1;
     float3 viewSpaceNormal : NORMAL;
     float3 viewSpaceTangent : TANGENT;
     float3 viewSpaceBitangent : BITANGENT;
@@ -55,8 +56,8 @@ struct MyCustomAttrIntersectionAttributes
 VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, float3 tangent : TANGENT, float2 texCoord : TEXCOORD)
 {
     VertexShaderOutput output;
-
     float4 p4 = mul(modelViewMatrix, float4(position, 1.0f));
+    output.objectSpacePosition = position;
     output.viewSpacePosition = p4.xyz;
     output.viewSpaceNormal = mul(modelViewMatrix, float4(normal, 0.0f)).xyz;
     output.clipSpacePosition = mul(projectionMatrix, p4);
@@ -75,7 +76,7 @@ float4 PS_main(VertexShaderOutput input)
     float lightDistance = length(lightPosition - input.clipSpacePosition.xyz);
     
     RayDesc ray;
-    ray.Origin = input.viewSpacePosition.xyz;
+    ray.Origin = input.objectSpacePosition.xyz; // ray needs to be in world space?!
     ray.Direction = normalize(lightDir);
     ray.TMin = 0.001;
     ray.TMax = lightDistance;
@@ -88,30 +89,37 @@ float4 PS_main(VertexShaderOutput input)
     
     // traverse TLAS
     q.Proceed();
-    //while (q.Proceed())
-    //{
-
-    //}
     
     if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
         // A triangle was hit
         hit = true;
-        q.CommitNonOpaqueTriangleHit();
     }
 
     // Shade the pixel based on ray result
     if (hit)
     {
-        hitPosition = ray.Origin + ray.Direction * q.CommittedRayT(); // CommitedRayT returns current TMax where hit was noticed
+        hitPosition = ray.Origin + ray.Direction * q.CommittedRayT(); // CommitedRayT() returns current TMax where hit was noticed
         // static color when in shadow
         finalColor = float4(0.2, 0.2, 0.2, 1.0);
     }
-    else
+    else // do normal lighting calculation
     {
-        // red for in lighting
-        float3 normalColor = float4(1.0, 0.0, 0.0, 1.0);
-        finalColor = float4(normalColor, 1.0);
+        float n = normalize(input.viewSpaceNormal);
+        float3 v = normalize(-input.viewSpacePosition);
+        float3 h = normalize(lightDir + v);
+
+        float f_diffuse = max(0.0f, dot(n, lightDir));
+        float f_specular = pow(max(0.0f, dot(n, h)), specularColorAndExponent.w);
+
+        // calculate each component
+        float4 ambient = g_textureAmbient.Sample(g_sampler, input.texCoord) * ambientColor;
+        float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor * f_diffuse;
+        float4 specular = float4(g_textureSpecular.Sample(g_sampler, input.texCoord) * specularColorAndExponent.xyz * f_specular, 1.0f);
+
+        float4 emissive = g_textureEmissive.Sample(g_sampler, input.texCoord);
+
+        finalColor = ambient + diffuse + specular + emissive;
     }
 
     return float4(finalColor.xyz, 1.0f);
