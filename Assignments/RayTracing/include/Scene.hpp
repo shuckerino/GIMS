@@ -106,7 +106,7 @@ public:
   /// constant buffer.</param>
   /// <param name="srvRootParameterIdx">In your root signature the paramer index of the Shader-Resource-View For the
   /// textures.</param>
-  void addToCommandList(const ComPtr<ID3D12GraphicsCommandList>& commandList, const f32m4 transformation,
+  void addToCommandList(const ComPtr<ID3D12GraphicsCommandList>& commandList, const f32m4 modelView, const f32m4 modelMatrix,
                         ui32 modelViewRootParameterIdx, ui32 materialConstantsRootParameterIdx,
                         ui32 srvRootParameterIdx);
 

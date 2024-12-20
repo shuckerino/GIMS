@@ -36,7 +36,7 @@ void SceneGraphViewerApp::createRootSignatures()
   CD3DX12_ROOT_PARAMETER   rootParameter[5] = {};
   CD3DX12_DESCRIPTOR_RANGE range            = {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0};
   rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);   // scene constant buffer
-  rootParameter[1].InitAsConstants(16, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE);        // mv matrix
+  rootParameter[1].InitAsConstants(32, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE);        // mv matrix
   rootParameter[2].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_PIXEL); // materials
   rootParameter[3].InitAsDescriptorTable(1, &range);                              // textures
   rootParameter[4].InitAsShaderResourceView(5);                                   // TLAS
@@ -161,9 +161,9 @@ void SceneGraphViewerApp::onDrawUI()
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
   ImGui::Checkbox("Use normal mapping (not really working)", &m_uiData.m_useNormalMapping);
-  ImGui::SliderFloat("Light x position", &m_uiData.m_lightDirection.x, -4.0f, 4.0f);
-  ImGui::SliderFloat("Light y position", &m_uiData.m_lightDirection.y, -4.0f, 4.0f);
-  ImGui::SliderFloat("Light z position", &m_uiData.m_lightDirection.z, -4.0f, 4.0f);
+  ImGui::SliderFloat("Light angle phi", &m_uiData.m_lightAngles.x, 0.0f, 180.0f);
+  ImGui::SliderFloat("Light angle theta", &m_uiData.m_lightAngles.y, 0.0f, 360.0f);
+  
   ImGui::End();
 }
 
@@ -173,7 +173,8 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
   updateSceneConstantBuffer();
 
   //  Assignment 6 (normalize scene)
-  const auto cameraAndNormalization = cameraMatrix * m_scene.getAABB().getNormalizationTransformation();
+  const auto modelMatrix            = m_scene.getAABB().getNormalizationTransformation();
+  const auto cameraAndNormalization = cameraMatrix * modelMatrix;
 
   cmdLst->SetPipelineState(m_pipelineState.Get());
 
@@ -186,7 +187,7 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
   // ray tracing
   cmdLst->SetGraphicsRootShaderResourceView(4, m_rayTracingUtils.m_topLevelAS->GetGPUVirtualAddress());
 
-  m_scene.addToCommandList(cmdLst, cameraAndNormalization, 1, 2, 3);
+  m_scene.addToCommandList(cmdLst, cameraAndNormalization, modelMatrix, 1, 2, 3);
 }
 
 #pragma endregion
@@ -218,7 +219,13 @@ void SceneGraphViewerApp::createSceneConstantBuffer()
 void SceneGraphViewerApp::updateSceneConstantBuffer()
 {
   SceneConstantBuffer cb;
-  cb.lightDirection = m_uiData.m_lightDirection;
+
+  const auto cx = cos(glm::radians(m_uiData.m_lightAngles.x));
+  const auto sx = sin(glm::radians(m_uiData.m_lightAngles.x));
+  const auto cy = cos(glm::radians(m_uiData.m_lightAngles.y));
+  const auto sy = sin(glm::radians(m_uiData.m_lightAngles.y));
+
+  cb.lightDirection = f32v3(sx * cy, sx * sy, cx);
   cb.flags          = m_uiData.m_useNormalMapping & 0x1;
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);

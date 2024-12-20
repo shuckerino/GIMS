@@ -6,7 +6,7 @@ using namespace gims;
 
 namespace
 {
-void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuTransformation,
+void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuModelView, f32m4 modelMatrix,
                           const ComPtr<ID3D12GraphicsCommandList>& commandList, ui32 modelViewRootParameterIdx,
                           ui32 materialConstantsRootParameterIdx, ui32 srvRootParameterIdx)
 {
@@ -17,14 +17,15 @@ void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuTransformation,
 
   const auto& currentNode = scene.getNode(nodeIdx);
   // update transformation
-  accuTransformation = accuTransformation * currentNode.transformation;
+  accuModelView = accuModelView * currentNode.transformation;
 
   // draw meshes
   for (ui32 m = 0; m < (ui32)currentNode.meshIndices.size(); m++)
   {
     const auto& meshToDraw   = scene.getMesh(currentNode.meshIndices[m]);
     const auto& meshMaterial = scene.getMaterial(meshToDraw.getMaterialIndex());
-    commandList->SetGraphicsRoot32BitConstants(modelViewRootParameterIdx, 16, &accuTransformation, 0);
+    commandList->SetGraphicsRoot32BitConstants(modelViewRootParameterIdx, 16, &accuModelView, 0);
+    commandList->SetGraphicsRoot32BitConstants(modelViewRootParameterIdx, 16, &modelMatrix, 16);
     commandList->SetGraphicsRootConstantBufferView(
         2, meshMaterial.materialConstantBuffer.getResource()->GetGPUVirtualAddress());
     
@@ -37,7 +38,7 @@ void addToCommandListImpl(Scene& scene, ui32 nodeIdx, f32m4 accuTransformation,
 
   for (ui32 c = 0; c < (ui32)currentNode.childIndices.size(); c++)
   {
-    addToCommandListImpl(scene, currentNode.childIndices[c], accuTransformation, commandList,
+    addToCommandListImpl(scene, currentNode.childIndices[c], accuModelView, modelMatrix, commandList,
                          modelViewRootParameterIdx,
                          materialConstantsRootParameterIdx, srvRootParameterIdx);
   }
@@ -75,11 +76,11 @@ const AABB& Scene::getAABB() const
   return m_aabb;
 }
 
-void Scene::addToCommandList(const ComPtr<ID3D12GraphicsCommandList>& commandList, const f32m4 transformation,
+void Scene::addToCommandList(const ComPtr<ID3D12GraphicsCommandList>& commandList, const f32m4 modelView, const f32m4 modelMatrix,
                              ui32 modelViewRootParameterIdx, ui32 materialConstantsRootParameterIdx,
                              ui32 srvRootParameterIdx)
 {
-  addToCommandListImpl(*this, 0,transformation, commandList, modelViewRootParameterIdx,
+  addToCommandListImpl(*this, 0, modelView, modelMatrix, commandList, modelViewRootParameterIdx,
                        materialConstantsRootParameterIdx, srvRootParameterIdx);
 }
 } // namespace gims

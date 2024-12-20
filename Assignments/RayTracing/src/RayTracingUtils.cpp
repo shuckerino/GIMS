@@ -134,7 +134,7 @@ void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device,
   geometryDesc.Triangles.IndexBuffer          = scene.getMesh(0).getIndexBuffer()->GetGPUVirtualAddress();
   geometryDesc.Triangles.IndexCount =
       static_cast<ui32>(scene.getMesh(0).getIndexBuffer()->GetDesc().Width) / sizeof(ui32);
-  geometryDesc.Triangles.IndexFormat  = DXGI_FORMAT_R16_UINT;
+  geometryDesc.Triangles.IndexFormat  = DXGI_FORMAT_R32_UINT;
   geometryDesc.Triangles.Transform3x4 = 0;
   geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
   geometryDesc.Triangles.VertexCount =

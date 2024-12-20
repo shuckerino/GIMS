@@ -3,6 +3,7 @@ struct VertexShaderOutput
     float4 clipSpacePosition : SV_POSITION;
     float3 viewSpacePosition : POSITION0;
     float3 objectSpacePosition : POSITION1;
+    float3 worldSpacePosition : POSITION2;
     float3 viewSpaceNormal : NORMAL;
     float3 viewSpaceTangent : TANGENT;
     float3 viewSpaceBitangent : BITANGENT;
@@ -15,7 +16,7 @@ struct VertexShaderOutput
 cbuffer PerFrameConstants : register(b0)
 {
     float4x4 projectionMatrix;
-    float3 lightPosition;
+    float3 lightDirection;
     uint1 flags;
 }
 
@@ -25,6 +26,7 @@ cbuffer PerFrameConstants : register(b0)
 cbuffer PerMeshConstants : register(b1)
 {
     float4x4 modelViewMatrix;
+    float4x4 modelMatrix;
 }
 
 /// <summary>
@@ -58,8 +60,9 @@ VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, f
     VertexShaderOutput output;
     float4 p4 = mul(modelViewMatrix, float4(position, 1.0f));
     output.objectSpacePosition = position;
+    output.worldSpacePosition = mul(modelMatrix, float4(position, 1.0f));
     output.viewSpacePosition = p4.xyz;
-    output.viewSpaceNormal = mul(modelViewMatrix, float4(normal, 0.0f)).xyz;
+    output.viewSpaceNormal = normal;
     output.clipSpacePosition = mul(projectionMatrix, p4);
     output.texCoord = texCoord;
 
@@ -72,16 +75,16 @@ float4 PS_main(VertexShaderOutput input)
     : SV_TARGET
 {
     // Compute light direction and distance
-    float3 lightDir = normalize(lightPosition - input.clipSpacePosition.xyz);
-    float lightDistance = length(lightPosition - input.clipSpacePosition.xyz);
+    //float3 lightDir = normalize(lightPosition - input.worldSpacePosition.xyz);
+    //float lightDistance = length(lightPosition - input.worldSpacePosition.xyz);
     
     RayDesc ray;
-    ray.Origin = input.objectSpacePosition.xyz; // ray needs to be in world space?!
-    ray.Direction = normalize(lightDir);
-    ray.TMin = 0.001;
-    ray.TMax = lightDistance;
+    ray.Origin = input.objectSpacePosition.xyz + 0.1 * normalize(input.viewSpaceNormal.xyz); // ray needs to be in world space?!
+    ray.Direction = normalize(lightDirection);
+    ray.TMin = 0.0001;
+    ray.TMax = 1e6;
     
-    RayQuery <RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> q;
+    RayQuery < RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES > q;
     q.TraceRayInline(TLAS, 0, 0xFF, ray);
     float3 finalColor = float3(0.0, 0.0, 0.0); // Initialize output color
     bool hit = false;
@@ -101,25 +104,26 @@ float4 PS_main(VertexShaderOutput input)
     {
         hitPosition = ray.Origin + ray.Direction * q.CommittedRayT(); // CommitedRayT() returns current TMax where hit was noticed
         // static color when in shadow
-        finalColor = float4(0.2, 0.2, 0.2, 1.0);
+        finalColor = float4(abs(hitPosition.x / 10.f), abs(hitPosition.y / 10.f), abs(hitPosition.z / 10.f), 1.0);
     }
     else // do normal lighting calculation
     {
-        float n = normalize(input.viewSpaceNormal);
-        float3 v = normalize(-input.viewSpacePosition);
-        float3 h = normalize(lightDir + v);
+        //float n = normalize(input.viewSpaceNormal);
+        //float3 v = normalize(-input.viewSpacePosition);
+        //float3 h = normalize(lightDir + v);
 
-        float f_diffuse = max(0.0f, dot(n, lightDir));
-        float f_specular = pow(max(0.0f, dot(n, h)), specularColorAndExponent.w);
+        //float f_diffuse = max(0.0f, dot(n, lightDir));
+        //float f_specular = pow(max(0.0f, dot(n, h)), specularColorAndExponent.w);
 
-        // calculate each component
-        float4 ambient = g_textureAmbient.Sample(g_sampler, input.texCoord) * ambientColor;
-        float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor * f_diffuse;
-        float4 specular = float4(g_textureSpecular.Sample(g_sampler, input.texCoord) * specularColorAndExponent.xyz * f_specular, 1.0f);
+        //// calculate each component
+        //float4 ambient = g_textureAmbient.Sample(g_sampler, input.texCoord) * ambientColor;
+        //float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor * f_diffuse;
+        //float4 specular = float4(g_textureSpecular.Sample(g_sampler, input.texCoord) * specularColorAndExponent.xyz * f_specular, 1.0f);
 
-        float4 emissive = g_textureEmissive.Sample(g_sampler, input.texCoord);
+        //float4 emissive = g_textureEmissive.Sample(g_sampler, input.texCoord);
 
-        finalColor = ambient + diffuse + specular + emissive;
+        //finalColor = ambient + diffuse + specular + emissive;
+        finalColor = float4(0.5f, 0.0f, 0.0f, 1.0f);
     }
 
     return float4(finalColor.xyz, 1.0f);
