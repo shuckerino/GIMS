@@ -80,6 +80,7 @@ float4 PS_main(VertexShaderOutput input)
     
     if (useRayTracing)
     {
+        finalColor = float3(0.0, 0.0, 1.0); // Miss color for ray tracing is blue
         RayDesc ray;
         ray.Origin = input.objectSpacePosition.xyz + 0.1 * normalize(input.viewSpaceNormal.xyz); // add shadow bias to avoid artifacts
         ray.Direction = normalize(lightDirection);
@@ -103,28 +104,29 @@ float4 PS_main(VertexShaderOutput input)
         if (hit) // is in shadow
         {
             hitPosition = ray.Origin + ray.Direction * q.CommittedRayT(); // CommitedRayT() returns current TMax where hit was noticed
-            finalColor = float4(abs(hitPosition.x / 10.f), abs(hitPosition.y / 10.f), abs(hitPosition.z / 10.f), 1.0);
+            //finalColor = float4(abs(hitPosition.x / 10.f), abs(hitPosition.y / 10.f), abs(hitPosition.z / 10.f), 1.0);
+            finalColor = float3(1.0f, 0.0f, 0.0f);
             //finalColor = finalColor - float3(0.2f, 0.2f, 0.2f);
         
         }
         else // do normal lighting calculation
         {
-            float n = normalize(input.viewSpaceNormal);
-            float3 v = normalize(-input.viewSpacePosition);
-            float3 h = normalize(lightDirection + v);
+            //float n = normalize(input.viewSpaceNormal);
+            //float3 v = normalize(-input.viewSpacePosition);
+            //float3 h = normalize(lightDirection + v);
 
-            float f_diffuse = max(0.0f, dot(n, lightDirection));
-            float f_specular = pow(max(0.0f, dot(n, h)), specularColorAndExponent.w);
+            //float f_diffuse = max(0.0f, dot(n, lightDirection));
+            //float f_specular = pow(max(0.0f, dot(n, h)), specularColorAndExponent.w);
 
-            // calculate each component
-            float4 ambient = g_textureAmbient.Sample(g_sampler, input.texCoord) * ambientColor;
-            float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor * f_diffuse;
-            float4 specular = float4(g_textureSpecular.Sample(g_sampler, input.texCoord) * specularColorAndExponent.xyz * f_specular, 1.0f);
+            //// calculate each component
+            //float4 ambient = g_textureAmbient.Sample(g_sampler, input.texCoord) * ambientColor;
+            //float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor * f_diffuse;
+            //float4 specular = float4(g_textureSpecular.Sample(g_sampler, input.texCoord) * specularColorAndExponent.xyz * f_specular, 1.0f);
 
-            float4 emissive = g_textureEmissive.Sample(g_sampler, input.texCoord);
+            //float4 emissive = g_textureEmissive.Sample(g_sampler, input.texCoord);
 
-            finalColor = ambient + diffuse + specular + emissive;
-            finalColor = float4(0.2f, 0.2f, 0.2f, 1.0f);
+            //finalColor = ambient + diffuse + specular + emissive;
+            //finalColor = float4(0.2f, 0.2f, 0.2f, 1.0f);
         }
     }
     else // normal shading
