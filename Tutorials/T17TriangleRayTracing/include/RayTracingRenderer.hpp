@@ -54,7 +54,6 @@ public:
 private:
   // Acceleration structure
   ComPtr<ID3D12Resource> m_topLevelAS;
-  ComPtr<ID3D12Resource> m_bottomLevelAS;
 
   // Root signatures
   ComPtr<ID3D12RootSignature> m_globalRootSignature;
@@ -63,8 +62,11 @@ private:
   typedef UINT16         Index;
   ui32                   m_vertexBufferSize; //! Vertex buffer size in bytes.
   ui32                   m_indexBufferSize;  //! Index buffer size in bytes.
+  ui32                   m_numIndices;  //! Num indices
   ComPtr<ID3D12Resource> m_indexBuffer;
   ComPtr<ID3D12Resource> m_vertexBuffer;
+  D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+  D3D12_INDEX_BUFFER_VIEW  m_indexBufferView;
 
   // Init functions
   bool isRayTracingSupported();

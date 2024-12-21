@@ -121,6 +121,13 @@ bool RayTracingUtils::isRayTracingSupported(ComPtr<ID3D12Device5> device)
   }
 }
 
+#pragma region Build acceleration structures
+
+/// <summary>
+/// Building geometry description for each mesh in the scene
+/// </summary>
+/// <param name="geometryDescriptions"></param>
+/// <param name="scene"></param>
 void RayTracingUtils::buildGeometryDescriptionsForBLAS(
     std::vector<D3D12_RAYTRACING_GEOMETRY_DESC>& geometryDescriptions, Scene& scene)
 {
@@ -146,8 +153,6 @@ void RayTracingUtils::buildGeometryDescriptionsForBLAS(
   }
 }
 
-#pragma region Build acceleration structures
-
 AccelerationStructureBuffers RayTracingUtils::buildBottomLevelAS(
     ComPtr<ID3D12Device5> device, ComPtr<ID3D12GraphicsCommandList4> commandList,
     const D3D12_RAYTRACING_GEOMETRY_DESC& geometryDescription)
@@ -164,23 +169,10 @@ AccelerationStructureBuffers RayTracingUtils::buildBottomLevelAS(
 
   // Create scratch buffer
   AllocateUAVBuffer(device, bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &scratchResource,
-                    D3D12_RESOURCE_STATE_COMMON, L"ScratchResource");
+                    D3D12_RESOURCE_STATE_COMMON, L"BLAS_ScratchResource");
 
-  D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-
-  AllocateUAVBuffer(device, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_bottomLevelAS, initialResourceState,
-                    L"BottomLevelAccelerationStructure");
-
-  // Create an instance desc for the bottom-level acceleration structure.
-  ComPtr<ID3D12Resource>         instanceDescs;
-  D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
-  instanceDesc.Transform[0][0]                = 1.0f;
-  instanceDesc.Transform[1][1]                = 1.0f;
-  instanceDesc.Transform[2][2]                = 1.0f;
-  instanceDesc.InstanceMask                   = 1;
-  instanceDesc.AccelerationStructure          = m_bottomLevelAS->GetGPUVirtualAddress();
-
-  AllocateUploadBuffer(device.Get(), &instanceDesc, sizeof(instanceDesc), &instanceDescs, L"InstanceDescs");
+  AllocateUAVBuffer(device, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_bottomLevelAS,
+                    D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"BottomLevelAccelerationStructure");
 
   // Bottom Level Acceleration Structure desc
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
@@ -207,10 +199,11 @@ AccelerationStructureBuffers RayTracingUtils::buildTopLevelAS(ComPtr<ID3D12Devic
   ComPtr<ID3D12Resource> topLevelAS;
 
   // Get required sizes for an acceleration structure.
-  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};
-  topLevelInputs.DescsLayout                                          = D3D12_ELEMENTS_LAYOUT_ARRAY;
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs    = {};
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC   topLevelBuildDesc = {};
+  topLevelInputs.DescsLayout                                             = D3D12_ELEMENTS_LAYOUT_ARRAY;
   topLevelInputs.Flags    = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-  topLevelInputs.NumDescs = 1;
+  topLevelInputs.NumDescs = 1; // only triangle geometry
   topLevelInputs.Type     = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
@@ -225,35 +218,17 @@ AccelerationStructureBuffers RayTracingUtils::buildTopLevelAS(ComPtr<ID3D12Devic
 
   AllocateUAVBuffer(device, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_topLevelAS, initialResourceState,
                     L"TopLevelAccelerationStructure");
-}
 
-#pragma endregion
+  D3D12_GPU_VIRTUAL_ADDRESS bottomLevelASaddresses = {
+      bottomLevelAS.at(0).accelerationStructure->GetGPUVirtualAddress(),
+  };
+  BuildBotomLevelASInstanceDescs<D3D12_RAYTRACING_INSTANCE_DESC>(bottomLevelASaddresses, &instanceDescsResource);
 
-void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device, Scene& scene,
-                                                   ComPtr<ID3D12GraphicsCommandList4> commandList,
-                                                   ComPtr<ID3D12CommandAllocator>     commandAllocator,
-                                                   ComPtr<ID3D12CommandQueue> commandQueue, SceneGraphViewerApp& app)
-{
-
-  // Reset the command list for the acceleration structure construction.
-  commandList->Reset(commandAllocator.Get(), nullptr);
-  const ui16 numMeshes = scene.getNumberOfMeshes();
-
-  // Build all BLAS for scene
-  std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescriptions;
-  geometryDescriptions.reserve(numMeshes);
-  buildGeometryDescriptionsForBLAS(geometryDescriptions, scene);
-
-  std::vector<AccelerationStructureBuffers> bottomLevelAccelerationStructures;
-  bottomLevelAccelerationStructures.reserve(numMeshes);
-  for (ui16 i = 0; i < geometryDescriptions.size(); i++)
-  {
-    bottomLevelAccelerationStructures.push_back(buildBottomLevelAS(device, commandList, geometryDescriptions.at(i)));
-  }
-
-  // build TLAS
-  AccelerationStructureBuffers topLevelAS = buildTopLevelAS(device, commandList, bottomLevelAccelerationStructures);
-
+  instanceDesc.Transform[0][0]       = 1.0f;
+  instanceDesc.Transform[1][1]       = 1.0f;
+  instanceDesc.Transform[2][2]       = 1.0f;
+  instanceDesc.InstanceMask          = 1;
+  instanceDesc.AccelerationStructure = m_bottomLevelAS->GetGPUVirtualAddress();
 
   AllocateUploadBuffer(device.Get(), &instanceDesc, sizeof(instanceDesc), &instanceDescs, L"InstanceDescs");
 
@@ -273,6 +248,47 @@ void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device,
     topLevelBuildDesc.DestAccelerationStructureData    = m_topLevelAS->GetGPUVirtualAddress();
     topLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
   }
+}
+
+#pragma endregion
+
+void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device, Scene& scene,
+                                                   ComPtr<ID3D12GraphicsCommandList4> commandList,
+                                                   ComPtr<ID3D12CommandAllocator>     commandAllocator,
+                                                   ComPtr<ID3D12CommandQueue> commandQueue, SceneGraphViewerApp& app)
+{
+
+  // Reset the command list for the acceleration structure construction.
+  commandList->Reset(commandAllocator.Get(), nullptr);
+  const ui16 numMeshes = scene.getNumberOfMeshes();
+
+  // Build all BLAS for scene
+  std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescriptions;
+  geometryDescriptions.reserve(numMeshes);
+  buildGeometryDescriptionsForBLAS(geometryDescriptions, scene);
+
+  std::vector<AccelerationStructureBuffers>   bottomLevelAccelerationStructures;
+  std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instanceDescs;
+  bottomLevelAccelerationStructures.reserve(numMeshes);
+  instanceDescs.resize(numMeshes);
+  for (ui16 i = 0; i < geometryDescriptions.size(); i++)
+  {
+    bottomLevelAccelerationStructures.push_back(buildBottomLevelAS(device, commandList, geometryDescriptions.at(i)));
+
+    // create instance description for each BLAS
+    instanceDescs[i].Transform[0][0]       = 1.0f;
+    instanceDescs[i].Transform[1][1]       = 1.0f;
+    instanceDescs[i].Transform[2][2]       = 1.0f;
+    instanceDescs[i].InstanceMask          = 1;
+    instanceDescs[i].AccelerationStructure = m_bottomLevelAS->GetGPUVirtualAddress();
+  }
+
+  ComPtr<ID3D12Resource> instanceDescsBuffer;
+  AllocateUploadBuffer(device.Get(), instanceDescs.data(), sizeof(instanceDescs), &instanceDescsBuffer,
+                       L"InstanceDescs");
+
+  // build TLAS
+  AccelerationStructureBuffers topLevelAS = buildTopLevelAS(device, commandList, bottomLevelAccelerationStructures);
 
   auto BuildAccelerationStructure = [&](auto* raytracingCommandList)
   {

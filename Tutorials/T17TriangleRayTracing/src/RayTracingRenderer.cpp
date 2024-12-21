@@ -89,7 +89,7 @@ void RayTracingRenderer::createRootSignature()
 {
   CD3DX12_ROOT_SIGNATURE_DESC descRootSignature;
   CD3DX12_ROOT_PARAMETER      rootParameter[1] = {};
-  rootParameter[0].InitAsShaderResourceView(0, 0, D3D12_SHADER_VISIBILITY_ALL); // TLAS
+  rootParameter[0].InitAsShaderResourceView(0); // TLAS
 
   descRootSignature.Init(_countof(rootParameter), rootParameter, 0, nullptr,
                          D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -109,8 +109,11 @@ void RayTracingRenderer::createPipeline()
   const auto pixelShader =
       compileShader(L"../../../Tutorials/T17TriangleRayTracing/Shaders/RayTracing.hlsl", L"PS_main", L"ps_6_8");
 
+  D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
+      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+
   D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-  psoDesc.InputLayout                        = {};
+  psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
   psoDesc.pRootSignature                     = m_globalRootSignature.Get();
   psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
   psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
@@ -139,7 +142,7 @@ RayTracingRenderer::RayTracingRenderer(const DX12AppConfig createInfo)
 
   createRayTracingResources();
 
-  //createRootSignature();
+  // createRootSignature();
   createPipeline();
 
   ComPtr<ID3D12Debug> debugController;
@@ -182,12 +185,14 @@ void RayTracingRenderer::createRootSignatures()
 {
   // First we create global root signature (shared across all shaders)
   {
-    //CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
-    //UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+    // CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
+    // UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
     CD3DX12_ROOT_PARAMETER rootParameters[1];
-    //rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
+    // rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
     rootParameters[0].InitAsShaderResourceView(0);
-    CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
+    CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc;
+    globalRootSignatureDesc.Init(ARRAYSIZE(rootParameters), rootParameters, 0, nullptr,
+                                 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
     ComPtr<ID3DBlob> rootBlob, errorBlob;
     D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
 
@@ -225,8 +230,6 @@ void RayTracingRenderer::createAccelerationStructures()
   // Reset the command list for the acceleration structure construction.
   getCommandList()->Reset(getCommandAllocator().Get(), nullptr);
 
-  // const auto geometryDescription = createGeometryDescription();
-
   D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
   geometryDesc.Type                           = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
   geometryDesc.Triangles.IndexBuffer          = m_indexBuffer->GetGPUVirtualAddress();
@@ -237,125 +240,93 @@ void RayTracingRenderer::createAccelerationStructures()
   geometryDesc.Triangles.VertexCount          = static_cast<UINT>(m_vertexBuffer->GetDesc().Width) / sizeof(Vertex);
   geometryDesc.Triangles.VertexBuffer.StartAddress  = m_vertexBuffer->GetGPUVirtualAddress();
   geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
+  geometryDesc.Flags                                = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
-  // Mark the geometry as opaque.
-  // PERFORMANCE TIP: mark geometry as opaque whenever applicable as it can enable important ray processing
-  // optimizations. Note: When rays encounter opaque geometry an any hit shader will not be executed whether it is
-  // present or not.
-  geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+  // create 3 instances of BLAS with the same geometry description
+  ComPtr<ID3D12Resource> blas[3];
+  ComPtr<ID3D12Resource> bottomLevelScratchResources[3];
+  for (ui8 i = 0; i < _countof(blas); i++)
+  {
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS  bottomLevelInputs       = {};
+    bottomLevelInputs.Type           = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+    bottomLevelInputs.pGeometryDescs = &geometryDesc;
+    getDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+    throwIfZero(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
-  // Get required sizes for an acceleration structure.
+    AllocateUAVBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &bottomLevelScratchResources[i],
+                      D3D12_RESOURCE_STATE_COMMON, L"BLASScratchResource");
+
+    AllocateUAVBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &blas[i],
+                      D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"BottomLevelAccelerationStructure");
+
+    // Bottom Level Acceleration Structure desc
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
+    {
+      bottomLevelBuildDesc.Inputs                           = bottomLevelInputs;
+      bottomLevelBuildDesc.ScratchAccelerationStructureData = bottomLevelScratchResources[i]->GetGPUVirtualAddress();
+      bottomLevelBuildDesc.DestAccelerationStructureData    = blas[i]->GetGPUVirtualAddress();
+    }
+
+    getCommandList()->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+    auto uav = CD3DX12_RESOURCE_BARRIER::UAV(blas[i].Get());
+    getCommandList()->ResourceBarrier(1, &uav);
+  }
+
+  // create instance descriptors
+  D3D12_RAYTRACING_INSTANCE_DESC instanceDescs[3] = {};
+
+  for (ui8 i = 0; i < _countof(instanceDescs); i++)
+  {
+    instanceDescs[i].InstanceID                          = i;
+    instanceDescs[i].InstanceContributionToHitGroupIndex = 0;
+    instanceDescs[i].Flags                               = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+    instanceDescs[i].AccelerationStructure               = blas[i]->GetGPUVirtualAddress();
+    instanceDescs[i].InstanceMask                        = 1;
+
+    // Set different transformations for each instance.
+    float offset                     = static_cast<float>(i) * .2f; // Example offset.
+    instanceDescs[i].Transform[0][0] = 1.0f;
+    instanceDescs[i].Transform[1][1] = 1.0f;
+    instanceDescs[i].Transform[2][2] = 1.0f;
+    instanceDescs[i].Transform[0][3] = offset; // Translate along x-axis.
+  }
+
+  // Allocate upload buffer for instance descriptors.
+  ComPtr<ID3D12Resource> instanceDescsBuffer;
+  AllocateUploadBuffer(getDevice().Get(), instanceDescs, sizeof(instanceDescs), &instanceDescsBuffer, L"InstanceDescs");
+
+  // create TLAS
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};
   topLevelInputs.DescsLayout                                          = D3D12_ELEMENTS_LAYOUT_ARRAY;
   topLevelInputs.Flags    = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-  topLevelInputs.NumDescs = 1;
+  topLevelInputs.NumDescs = 3;
   topLevelInputs.Type     = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
   getDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
   throwIfZero(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
-  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
-  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS  bottomLevelInputs       = topLevelInputs;
-  bottomLevelInputs.Type           = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-  bottomLevelInputs.pGeometryDescs = &geometryDesc;
-  getDevice()->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-  throwIfZero(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
+  ComPtr<ID3D12Resource> topLevelScratchResource;
+  AllocateUAVBuffer(topLevelPrebuildInfo.ScratchDataSizeInBytes, &topLevelScratchResource, D3D12_RESOURCE_STATE_COMMON,
+                    L"TLASScratchResource");
 
-  // Scratch resource used to
-  ComPtr<ID3D12Resource> scratchResource;
-  AllocateUAVBuffer(
-      std::max(topLevelPrebuildInfo.ScratchDataSizeInBytes, bottomLevelPrebuildInfo.ScratchDataSizeInBytes),
-      &scratchResource, D3D12_RESOURCE_STATE_COMMON, L"ScratchResource");
-
-  // Allocate resources for acceleration structures.
-  // Acceleration structures can only be placed in resources that are created in the default heap (or custom heap
-  // equivalent). Default heap is OK since the application doesnt need CPU read/write access to them. The resources
-  // that will contain acceleration structures must be created in the state
-  // D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, and must have resource flag
-  // D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS. The ALLOW_UNORDERED_ACCESS requirement simply acknowledges both:
-  //  - the system will be doing this type of access in its implementation of acceleration structure builds behind the
-  //  scenes.
-  //  - from the app point of view, synchronization of writes/reads to acceleration structures is accomplished using
-  // UAV /  barriers.
-  {
-    D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-
-    // D3D12_RESOURCE_DESC desc = {};
-    // desc.Dimension           = D3D12_RESOURCE_DIMENSION_BUFFER;
-    // desc.Alignment           = 0;
-    // desc.Width               = bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes;
-    // desc.Height              = 1;
-    // desc.DepthOrArraySize    = 1;
-    // desc.MipLevels           = 1;
-    // desc.Format              = DXGI_FORMAT_UNKNOWN;
-    // desc.SampleDesc.Count    = 1;
-    // desc.SampleDesc.Quality  = 0;
-    // desc.Layout              = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    // desc.Flags               = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-    // D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-
-    // UploadHelper bottomLevelUploader(getDevice(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes);
-    // bottomLevelUploader.uploadBuffer(&desc, &m_bottomLevelAS, )
-
-    AllocateUAVBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_bottomLevelAS, initialResourceState,
-                      L"BottomLevelAccelerationStructure");
-    AllocateUAVBuffer(topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_topLevelAS, initialResourceState,
-                      L"TopLevelAccelerationStructure");
-  }
-
-  // Create an instance desc for the bottom-level acceleration structure.
-  ComPtr<ID3D12Resource>         instanceDescs;
-  D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
-  instanceDesc.Transform[0][0]                = 1.0f;
-  instanceDesc.Transform[1][1]                = 1.0f;
-  instanceDesc.Transform[2][2]                = 1.0f;
-  instanceDesc.InstanceMask                   = 1;
-  instanceDesc.AccelerationStructure          = m_bottomLevelAS->GetGPUVirtualAddress();
-
-  // UploadHelper uploadHelper(getDevice(), sizeof(instanceDesc));
-
-  // auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-  // auto bufferDesc           = CD3DX12_RESOURCE_DESC::Buffer(sizeof(instanceDesc));
-  // throwIfFailed(getDevice()->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &bufferDesc,
-  //                                                    D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-  //                                                    IID_PPV_ARGS(&instanceDescs)));
-
-  // uploadHelper.uploadDefaultBuffer(&instanceDesc, instanceDescs, sizeof(instanceDesc), getCommandQueue());
-
-  AllocateUploadBuffer(getDevice().Get(), &instanceDesc, sizeof(instanceDesc), &instanceDescs, L"InstanceDescs");
-
-  // Bottom Level Acceleration Structure desc
-  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
-  {
-    bottomLevelBuildDesc.Inputs                           = bottomLevelInputs;
-    bottomLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
-    bottomLevelBuildDesc.DestAccelerationStructureData    = m_bottomLevelAS->GetGPUVirtualAddress();
-  }
+  AllocateUAVBuffer(topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_topLevelAS,
+                    D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"TopLevelAccelerationStructure");
 
   // Top Level Acceleration Structure desc
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
   {
-    topLevelInputs.InstanceDescs                       = instanceDescs->GetGPUVirtualAddress();
+    topLevelInputs.InstanceDescs                       = instanceDescsBuffer->GetGPUVirtualAddress();
     topLevelBuildDesc.Inputs                           = topLevelInputs;
     topLevelBuildDesc.DestAccelerationStructureData    = m_topLevelAS->GetGPUVirtualAddress();
-    topLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
+    topLevelBuildDesc.ScratchAccelerationStructureData = topLevelScratchResource->GetGPUVirtualAddress();
   }
 
-  auto BuildAccelerationStructure = [&](auto* raytracingCommandList)
-  {
-    raytracingCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-    auto uav = CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAS.Get());
-    getCommandList()->ResourceBarrier(1, &uav);
-    raytracingCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
-  };
+  // Build TLAS.
+  getCommandList()->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
 
-  // Build acceleration structure.
-  BuildAccelerationStructure(getCommandList().Get());
-
-  // Start acceleration structure construction
-  getCommandList()->Close(); // needs to be closed before execution
+  getCommandList()->Close();
   ID3D12CommandList* commandLists[] = {getCommandList().Get()};
   getCommandQueue()->ExecuteCommandLists(1, commandLists);
 
@@ -368,17 +339,29 @@ void RayTracingRenderer::createGeometry()
   auto  device    = getDevice().Get();
   Index indices[] = {0, 1, 2};
 
-  float  depthValue = 1.0;
-  float  offset     = 0.7f;
-  Vertex vertices[] = {// The sample raytraces in screen space coordinates.
+  float  depthValue  = 1.0;
+  float  offset      = 0.7f;
+  Vertex vertices[]  = {// The sample raytraces in screen space coordinates.
                        // Since DirectX screen space coordinates are right handed (i.e. Y axis points down).
                        // Define the vertices in counter clockwise order ~ clockwise in left handed.
                        {0, -offset, depthValue},
                        {-offset, offset, depthValue},
                        {offset, offset, depthValue}};
+  m_vertexBufferSize = sizeof(vertices);
+  m_indexBufferSize  = sizeof(indices);
+  m_numIndices       = _countof(indices);
 
   AllocateUploadBuffer(device, vertices, sizeof(vertices), &m_vertexBuffer);
   AllocateUploadBuffer(device, indices, sizeof(indices), &m_indexBuffer);
+
+  // create views
+  m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+  m_vertexBufferView.SizeInBytes    = static_cast<ui32>(m_vertexBufferSize);
+  m_vertexBufferView.StrideInBytes  = sizeof(Vertex);
+
+  m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+  m_indexBufferView.SizeInBytes    = static_cast<ui32>(m_indexBufferSize);
+  m_indexBufferView.Format         = DXGI_FORMAT_R16_UINT;
 }
 
 #pragma endregion
@@ -387,10 +370,6 @@ void RayTracingRenderer::createGeometry()
 
 void RayTracingRenderer::onDraw()
 {
-  // throwIfFailed(m_dxrCommandList->Close());
-  // DoRayTracing();
-  // CopyRaytracingOutputToBackbuffer();
-
   const auto commandList = getCommandList();
   const auto rtvHandle   = getRTVHandle();
   const auto dsvHandle   = getDSVHandle();
@@ -406,11 +385,13 @@ void RayTracingRenderer::onDraw()
   commandList->SetPipelineState(m_pipelineState.Get());
   commandList->SetGraphicsRootSignature(m_globalRootSignature.Get());
   commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+  commandList->IASetIndexBuffer(&m_indexBufferView);
 
   // bind tlas for inline ray tracing
   commandList->SetGraphicsRootShaderResourceView(0, m_topLevelAS->GetGPUVirtualAddress());
 
-  commandList->DrawInstanced(3, 1, 0, 0);
+  commandList->DrawInstanced(m_numIndices, 1, 0, 0);
 }
 
 void RayTracingRenderer::onDrawUI()

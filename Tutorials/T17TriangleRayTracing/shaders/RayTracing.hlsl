@@ -1,16 +1,24 @@
-static const float3 vertices[] = { { 0.0f, 0.25f, 0.0f }, { 0.25f, -0.25f, 0.0f }, { -0.25f, -0.25f, 0.0f } };
+static const float3 colors[] = { { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } };
 
 struct VertexShaderOutput
 {
     float4 position : SV_POSITION;
+    float4 color : COLOR;
 };
 
-RaytracingAccelerationStructure Scene : register(t0, space0); // Acceleration structure
+struct VertexShaderInput
+{
+    float3 position : POSITION;
+    uint i : SV_VertexID;
+};
 
-VertexShaderOutput VS_main(uint i : SV_VertexID)
+RaytracingAccelerationStructure TLAS : register(t0, space0); // Acceleration structure
+
+VertexShaderOutput VS_main(VertexShaderInput input)
 {
     VertexShaderOutput output;
-    output.position = float4(vertices[i], 1.0f);
+    output.position = float4(input.position, 1.0f);
+    output.color = float4(colors[input.i], 1.0f);
     return output;
 }
 
@@ -30,7 +38,7 @@ float4 PS_main(VertexShaderOutput input) : SV_TARGET
     ray.TMax = lightDistance;
     
     RayQuery < RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES > q;
-    q.TraceRayInline(Scene, 0, 0xFF, ray);
+    q.TraceRayInline(TLAS, 0, 0xFF, ray);
     q.Proceed();
     
     float3 color = float3(0.1, 0.1, 0.1); // Ambient light
@@ -45,7 +53,7 @@ float4 PS_main(VertexShaderOutput input) : SV_TARGET
     //    return float4(0, 0, 1, 1.0f);
     //}
     
-    return float4(color, 1.0);
+    return input.color;
  
     //return float4(0.0f, 0.8f, 0.0f, 1.0f);
     
