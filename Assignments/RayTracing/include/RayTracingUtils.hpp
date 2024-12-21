@@ -27,7 +27,8 @@ public:
                                                SceneGraphViewerApp& app);
 
   // Acceleration structure
-  ComPtr<ID3D12Resource> m_topLevelAS;
+  ComPtr<ID3D12Resource>              m_topLevelAS;
+  std::vector<ComPtr<ID3D12Resource>> m_bottomLevelAS;
 
   bool isRayTracingSupported(ComPtr<ID3D12Device5> device);
   void createAccelerationStructures(ComPtr<ID3D12Device5> device, Scene& scene,
@@ -37,7 +38,6 @@ public:
 
   void buildGeometryDescriptionsForBLAS(std::vector<D3D12_RAYTRACING_GEOMETRY_DESC>& geometryDescriptions,
                                         Scene&                                       scene);
-
 };
 
 RayTracingUtils::~RayTracingUtils()
