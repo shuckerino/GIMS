@@ -17,6 +17,7 @@ cbuffer PerFrameConstants : register(b0)
 {
     float4x4 projectionMatrix;
     float3 lightDirection;
+    float shadowBias;
     uint1 flags;
 }
 
@@ -83,7 +84,7 @@ float4 PS_main(VertexShaderOutput input)
     {
         finalColor = float3(0.0, 0.0, 1.0); // Miss color for ray tracing is blue
         RayDesc ray;
-        ray.Origin = input.objectSpacePosition.xyz + 0.1 * normalize(input.viewSpaceNormal.xyz); // add shadow bias to avoid artifacts
+        ray.Origin = input.worldSpacePosition.xyz + shadowBias * normalize(input.viewSpaceNormal.xyz); // add shadow bias to avoid artifacts
         ray.Direction = lightDir;
         ray.TMin = 0.0001;
         ray.TMax = 1e6;
@@ -112,7 +113,7 @@ float4 PS_main(VertexShaderOutput input)
     
     if (hit) // is in shadow
     {
-        finalColor *= 0.5f;
+        finalColor *= 0.8f;
     }
 
     return float4(finalColor.xyz, 1.0f);

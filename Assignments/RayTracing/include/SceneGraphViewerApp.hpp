@@ -1,10 +1,10 @@
 #pragma once
 #include "RayTracingUtils.hpp"
 #include "Scene.hpp"
+#include "StepTimer.h"
 #include <gimslib/d3d/DX12App.hpp>
 #include <gimslib/types.hpp>
 #include <gimslib/ui/ExaminerController.hpp>
-#include "StepTimer.h"
 using namespace gims;
 
 /// <summary>
@@ -60,6 +60,7 @@ private:
     f32v2 m_lightAngles     = f32v2(0.0f, 0.0f);
     f32v3 m_lightDirection  = f32v3(0.0f, 0.0f, -1.0f);
     bool  m_useRayTracing;
+    f32   m_shadowBias = 1.0f;
   };
 
   ComPtr<ID3D12PipelineState>      m_pipelineState;

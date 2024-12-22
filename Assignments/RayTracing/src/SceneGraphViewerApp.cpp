@@ -170,6 +170,7 @@ void SceneGraphViewerApp::onDrawUI()
   ImGui::SliderFloat("Light direction x", &m_uiData.m_lightDirection.x, -1.0f, 1.0f);
   ImGui::SliderFloat("Light direction y", &m_uiData.m_lightDirection.y, -1.0f, 1.0f);
   ImGui::SliderFloat("Light direction z", &m_uiData.m_lightDirection.z, -1.0f, 1.0f);
+  ImGui::SliderFloat("Shadow bias", &m_uiData.m_shadowBias, 0.0f, 5.0f);
 
   ImGui::End();
 }
@@ -194,7 +195,7 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
   // ray tracing
   cmdLst->SetGraphicsRootShaderResourceView(4, m_rayTracingUtils.m_topLevelAS->GetGPUVirtualAddress());
 
-  m_scene.addToCommandList(cmdLst, cameraAndNormalization, modelMatrix, 1, 2, 3);
+  m_scene.addToCommandList(cmdLst, cameraAndNormalization, 1, 2, 3);
 }
 
 #pragma endregion
@@ -207,6 +208,7 @@ struct SceneConstantBuffer
 {
   f32m4 projectionMatrix;
   f32v3 lightDirection;
+  f32   shadowBias;
   ui8   flags;
 };
 
@@ -234,6 +236,7 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
 
   // cb.lightDirection = f32v3(sx * cy, sx * sy, cx);
   cb.lightDirection = m_uiData.m_lightDirection;
+  cb.shadowBias = m_uiData.m_shadowBias;
   cb.flags          = m_uiData.m_useRayTracing & 0x1;
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
