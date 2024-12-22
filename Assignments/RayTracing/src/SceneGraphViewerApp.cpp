@@ -22,7 +22,7 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
                                                                getWidth(), (*this)))
 {
   m_examinerController.setTranslationVector(f32v3(0, -0.25f, 1.5));
-  m_uiData.m_useRayTracing = false;
+  m_uiData.m_useRayTracing = true;
   createRootSignatures();
   createSceneConstantBuffer();
   createPipeline();
@@ -148,8 +148,11 @@ void SceneGraphViewerApp::onDrawUI()
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
   ImGui::Checkbox("Use ray tracing", &m_uiData.m_useRayTracing);
-  ImGui::SliderFloat("Light angle phi", &m_uiData.m_lightAngles.x, 0.0f, 180.0f);
-  ImGui::SliderFloat("Light angle theta", &m_uiData.m_lightAngles.y, 0.0f, 360.0f);
+  //ImGui::SliderFloat("Light angle phi", &m_uiData.m_lightAngles.x, 0.0f, 180.0f);
+  //ImGui::SliderFloat("Light angle theta", &m_uiData.m_lightAngles.y, 0.0f, 360.0f);
+  ImGui::SliderFloat("Light direction x", &m_uiData.m_lightDirection.x, -1.0f, 1.0f);
+  ImGui::SliderFloat("Light direction y", &m_uiData.m_lightDirection.y, -1.0f, 1.0f);
+  ImGui::SliderFloat("Light direction z", &m_uiData.m_lightDirection.z, -1.0f, 1.0f);
   
   ImGui::End();
 }
@@ -207,12 +210,13 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
 {
   SceneConstantBuffer cb;
 
-  const auto cx = cos(glm::radians(m_uiData.m_lightAngles.x));
-  const auto sx = sin(glm::radians(m_uiData.m_lightAngles.x));
-  const auto cy = cos(glm::radians(m_uiData.m_lightAngles.y));
-  const auto sy = sin(glm::radians(m_uiData.m_lightAngles.y));
+  //const auto cx = cos(glm::radians(m_uiData.m_lightAngles.x));
+  //const auto sx = sin(glm::radians(m_uiData.m_lightAngles.x));
+  //const auto cy = cos(glm::radians(m_uiData.m_lightAngles.y));
+  //const auto sy = sin(glm::radians(m_uiData.m_lightAngles.y));
 
-  cb.lightDirection = f32v3(sx * cy, sx * sy, cx);
+  //cb.lightDirection = f32v3(sx * cy, sx * sy, cx);
+  cb.lightDirection = m_uiData.m_lightDirection;
   cb.flags          = m_uiData.m_useRayTracing & 0x1;
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);

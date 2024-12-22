@@ -13,8 +13,8 @@ int main(int /* argc*/, char /* **argv */)
   config.title    = L"D3D12 Assimp Viewer";
   try
   {
-    //const std::filesystem::path path = "../../../data/NobleCraftsman/scene.gltf";
-    const std::filesystem::path path = "../../../data/sphere/scene.gltf";
+    const std::filesystem::path path = "../../../data/NobleCraftsman/scene.gltf";
+    //const std::filesystem::path path = "../../../data/sphere/scene.gltf";
     //const std::filesystem::path path = "../../../data/deer_toy_gltf/scene.gltf";
     //const std::filesystem::path path = "../../../data/fantasy_landscape_1_gltf/scene.gltf";
     //const std::filesystem::path path = "../../../data/formula_1_car_concept_gltf/scene.gltf";

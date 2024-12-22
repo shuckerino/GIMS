@@ -174,15 +174,15 @@ void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device,
     //  Create geometry description for each mesh
     D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
     geometryDesc.Type                           = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-    geometryDesc.Triangles.IndexBuffer          = scene.getMesh(0).getIndexBuffer()->GetGPUVirtualAddress();
+    geometryDesc.Triangles.IndexBuffer          = scene.getMesh(i).getIndexBuffer()->GetGPUVirtualAddress();
     geometryDesc.Triangles.IndexCount =
-        static_cast<ui32>(scene.getMesh(0).getIndexBuffer()->GetDesc().Width) / sizeof(ui32);
+        static_cast<ui32>(scene.getMesh(i).getIndexBuffer()->GetDesc().Width) / sizeof(ui32);
     geometryDesc.Triangles.IndexFormat  = DXGI_FORMAT_R32_UINT;
     geometryDesc.Triangles.Transform3x4 = 0;
     geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
     geometryDesc.Triangles.VertexCount =
-        static_cast<ui32>(scene.getMesh(0).getVertexBuffer()->GetDesc().Width) / sizeof(Vertex);
-    geometryDesc.Triangles.VertexBuffer.StartAddress  = scene.getMesh(0).getVertexBuffer()->GetGPUVirtualAddress();
+        static_cast<ui32>(scene.getMesh(i).getVertexBuffer()->GetDesc().Width) / sizeof(Vertex);
+    geometryDesc.Triangles.VertexBuffer.StartAddress  = scene.getMesh(i).getVertexBuffer()->GetGPUVirtualAddress();
     geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
     geometryDesc.Flags                                = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
@@ -213,10 +213,10 @@ void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device,
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
     bottomLevelBuildDesc.Inputs                                             = bottomLevelInputs;
     bottomLevelBuildDesc.ScratchAccelerationStructureData                   = scratchResource->GetGPUVirtualAddress();
-    bottomLevelBuildDesc.DestAccelerationStructureData = m_bottomLevelAS.at(0)->GetGPUVirtualAddress();
+    bottomLevelBuildDesc.DestAccelerationStructureData = m_bottomLevelAS.at(i)->GetGPUVirtualAddress();
 
     commandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-    auto uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAS.at(0).Get());
+    auto uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAS.at(i).Get());
     commandList->ResourceBarrier(1, &uavBarrier);
 
     // create instance description for each BLAS
@@ -225,7 +225,7 @@ void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device,
     instanceDesc.Transform[1][1]                = 1.0f;
     instanceDesc.Transform[2][2]                = 1.0f;
     instanceDesc.InstanceMask                   = 1;
-    instanceDesc.AccelerationStructure          = m_bottomLevelAS.at(0)->GetGPUVirtualAddress();
+    instanceDesc.AccelerationStructure          = m_bottomLevelAS.at(i)->GetGPUVirtualAddress();
     instanceDescs.push_back(instanceDesc);
   }
 
