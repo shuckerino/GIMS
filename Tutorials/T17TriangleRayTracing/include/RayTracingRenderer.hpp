@@ -17,10 +17,10 @@ class RayTracingRenderer : public DX12App
 public:
   RayTracingRenderer(const DX12AppConfig createInfo);
 
-  //struct Vertex
+  // struct Vertex
   //{
-  //  f32v3 position;
-  //};
+  //   f32v3 position;
+  // };
   struct Vertex
   {
     float v1, v2, v3;
@@ -41,72 +41,38 @@ public:
   /// </summary>
   virtual void onResize();
 
+#pragma region Rasterizing
+
+  ComPtr<ID3D12PipelineState> m_pipelineState;
+  ComPtr<ID3D12RootSignature> m_rootSignature;
+
+  void createRootSignature();
+  void createPipeline();
+
+#pragma endregion
+
 private:
   // Acceleration structure
   ComPtr<ID3D12Resource> m_topLevelAS;
-  ComPtr<ID3D12Resource> m_bottomLevelAS;
 
   // Root signatures
   ComPtr<ID3D12RootSignature> m_globalRootSignature;
-  ComPtr<ID3D12RootSignature> m_LocalRootSignature;
-
-  // Ray tracing output
-  ComPtr<ID3D12Resource>      m_raytracingOutput;
-  D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
-  UINT                        m_raytracingOutputResourceUAVDescriptorHeapIndex;
-
-  ComPtr<ID3D12StateObject> m_rtStateObject;
-
-  // Descriptor heap
-  ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
-  ui32                         m_descriptorsAllocated;
-  ui32                         m_descriptorSize;
-
-  // Shader tables
-  static const wchar_t*  c_hitGroupName;
-  static const wchar_t*  c_raygenShaderName;
-  static const wchar_t*  c_closestHitShaderName;
-  static const wchar_t*  c_missShaderName;
-  ComPtr<ID3D12Resource> m_missShaderTable;
-  ComPtr<ID3D12Resource> m_hitGroupShaderTable;
-  ComPtr<ID3D12Resource> m_rayGenShaderTable;
-
-  // Raytracing scene
-  struct Viewport
-  {
-    float left;
-    float top;
-    float right;
-    float bottom;
-  };
-  struct RayGenConstantBuffer
-  {
-    Viewport viewport;
-    Viewport stencil;
-  };
-  RayGenConstantBuffer m_rayGenCB;
 
   // Geometry
-  typedef UINT16 Index;
-  ui32                     m_vertexBufferSize; //! Vertex buffer size in bytes.
-  ui32                     m_indexBufferSize;  //! Index buffer size in bytes.
-  ComPtr<ID3D12Resource>   m_indexBuffer;
-  ComPtr<ID3D12Resource>   m_vertexBuffer;
+  typedef UINT16         Index;
+  ui32                   m_vertexBufferSize; //! Vertex buffer size in bytes.
+  ui32                   m_indexBufferSize;  //! Index buffer size in bytes.
+  ui32                   m_numIndices;  //! Num indices
+  ComPtr<ID3D12Resource> m_indexBuffer;
+  ComPtr<ID3D12Resource> m_vertexBuffer;
+  D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+  D3D12_INDEX_BUFFER_VIEW  m_indexBufferView;
 
   // Init functions
   bool isRayTracingSupported();
   void createRayTracingResources();
   void createRootSignatures();
-  void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
-  void createRayTracingPipeline();
-  void createShaderTables();
-  void createDescriptorHeap();
-
-  /// <summary>
-  /// Creates the ray tracing output resource (UAV)
-  /// </summary>
-  void createOutputResource();
-
+ 
   // Geometry functions
   void createGeometry();
 
@@ -117,17 +83,5 @@ private:
   // Helper functions
   void AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppResource, D3D12_RESOURCE_STATES initialResourceState,
                          const wchar_t* resourceName);
-  void DoRayTracing();
-
-  /// <summary>
-  /// Copies the raytracing output to the actual renderTarget
-  /// </summary>
-  void CopyRaytracingOutputToBackbuffer();
-  struct AccelerationStructureBuffers
-  {
-    ComPtr<ID3D12Resource> pScratch;      // Scratch memory for AS builder
-    ComPtr<ID3D12Resource> pResult;       // Where the AS is
-    ComPtr<ID3D12Resource> pInstanceDesc; // Hold the matrices of the instances
-  };
-
+ 
 };
