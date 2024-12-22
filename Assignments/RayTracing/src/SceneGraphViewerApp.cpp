@@ -141,19 +141,36 @@ void SceneGraphViewerApp::onDraw()
 
 void SceneGraphViewerApp::onDrawUI()
 {
+  m_timer.Tick();
+  static int    frameCnt    = 0;
+  static double elapsedTime = 0.0f;
+  double        totalTime   = m_timer.GetTotalSeconds();
+  frameCnt++;
+
+  // Compute averages over one second period.
+  if ((totalTime - elapsedTime) >= 1.0f)
+  {
+    float diff = static_cast<float>(totalTime - elapsedTime);
+    float fps  = static_cast<float>(frameCnt) / diff; // Normalize to an exact second.
+
+    frameCnt    = 0;
+    elapsedTime = totalTime;
+
+    m_numRaysPerSecond = (getWidth() * getHeight() * fps) / static_cast<float>(1e6);
+  }
+
   const auto imGuiFlags = m_examinerController.active() ? ImGuiWindowFlags_NoInputs : ImGuiWindowFlags_None;
   ImGui::Begin("Information", nullptr, imGuiFlags);
   ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
+  ImGui::Text("Million Primary Rays/s: %f", m_numRaysPerSecond);
   ImGui::End();
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
   ImGui::Checkbox("Use ray tracing", &m_uiData.m_useRayTracing);
-  //ImGui::SliderFloat("Light angle phi", &m_uiData.m_lightAngles.x, 0.0f, 180.0f);
-  //ImGui::SliderFloat("Light angle theta", &m_uiData.m_lightAngles.y, 0.0f, 360.0f);
   ImGui::SliderFloat("Light direction x", &m_uiData.m_lightDirection.x, -1.0f, 1.0f);
   ImGui::SliderFloat("Light direction y", &m_uiData.m_lightDirection.y, -1.0f, 1.0f);
   ImGui::SliderFloat("Light direction z", &m_uiData.m_lightDirection.z, -1.0f, 1.0f);
-  
+
   ImGui::End();
 }
 
@@ -210,12 +227,12 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
 {
   SceneConstantBuffer cb;
 
-  //const auto cx = cos(glm::radians(m_uiData.m_lightAngles.x));
-  //const auto sx = sin(glm::radians(m_uiData.m_lightAngles.x));
-  //const auto cy = cos(glm::radians(m_uiData.m_lightAngles.y));
-  //const auto sy = sin(glm::radians(m_uiData.m_lightAngles.y));
+  // const auto cx = cos(glm::radians(m_uiData.m_lightAngles.x));
+  // const auto sx = sin(glm::radians(m_uiData.m_lightAngles.x));
+  // const auto cy = cos(glm::radians(m_uiData.m_lightAngles.y));
+  // const auto sy = sin(glm::radians(m_uiData.m_lightAngles.y));
 
-  //cb.lightDirection = f32v3(sx * cy, sx * sy, cx);
+  // cb.lightDirection = f32v3(sx * cy, sx * sy, cx);
   cb.lightDirection = m_uiData.m_lightDirection;
   cb.flags          = m_uiData.m_useRayTracing & 0x1;
   cb.projectionMatrix =

@@ -30,6 +30,7 @@ public:
   struct Node
   {
     f32m4             transformation; //! Transformation to parent node.
+    f32m4             worldSpaceTransformation; //! Transformation into world space
     std::vector<ui32> meshIndices;    //! Index in the array of meshIndices, i.e., Scene::m_meshes[].
     std::vector<ui32> childIndices;   //! Index in the array of nodes, i.e.,Scene::m_nodes[].
   };
