@@ -24,7 +24,7 @@ inline void uploadDefaultBuffer(ComPtr<ID3D12Device5>& device, void* dataSrc, UI
   }
 }
 
-void AllocateUAVBuffer(ComPtr<ID3D12Device5> device, ui64 bufferSize, ID3D12Resource** ppResource,
+inline void allocateUAVBuffer(ComPtr<ID3D12Device5> device, ui64 bufferSize, ID3D12Resource** ppResource,
                        D3D12_RESOURCE_STATES initialResourceState, const wchar_t* resourceName)
 {
   D3D12_RESOURCE_DESC desc = {};
@@ -180,12 +180,12 @@ void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device,
 
       // Create scratch buffer
       ComPtr<ID3D12Resource> scratchResource;
-      AllocateUAVBuffer(device, bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &scratchResource,
+      allocateUAVBuffer(device, bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &scratchResource,
                         D3D12_RESOURCE_STATE_COMMON, L"BLAS_ScratchResource");
       scratchResources.push_back(scratchResource);
 
       ComPtr<ID3D12Resource> blasResource;
-      AllocateUAVBuffer(device, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &blasResource,
+      allocateUAVBuffer(device, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &blasResource,
                         D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"BottomLevelAccelerationStructure");
       m_bottomLevelAS.push_back(blasResource);
       const ui8 index = static_cast<ui8>(m_bottomLevelAS.size() - 1);
@@ -243,10 +243,10 @@ void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device,
   throwIfZero(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
   ComPtr<ID3D12Resource> topLevelScratchResource;
-  AllocateUAVBuffer(device, topLevelPrebuildInfo.ScratchDataSizeInBytes, &topLevelScratchResource,
+  allocateUAVBuffer(device, topLevelPrebuildInfo.ScratchDataSizeInBytes, &topLevelScratchResource,
                     D3D12_RESOURCE_STATE_COMMON, L"TLAS_ScratchResource");
 
-  AllocateUAVBuffer(device, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_topLevelAS,
+  allocateUAVBuffer(device, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_topLevelAS,
                     D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"TopLevelAccelerationStructure");
 
   // Top Level Acceleration Structure desc
