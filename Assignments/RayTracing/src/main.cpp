@@ -14,6 +14,7 @@ int main(int /* argc*/, char /* **argv */)
   try
   {
     const std::filesystem::path path = "../../../data/NobleCraftsman/scene.gltf";
+    //const std::filesystem::path path = "../../../data/postwar_city/scene.gltf";
     //const std::filesystem::path path = "../../../data/sponza/glTF/Sponza.gltf";
     //const std::filesystem::path path = "../../../data/sphere/scene.gltf";
     //const std::filesystem::path path = "../../../data/deer_toy_gltf/scene.gltf";

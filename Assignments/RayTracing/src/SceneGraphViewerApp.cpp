@@ -24,6 +24,7 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
   m_uiData.m_useRayTracing = true;
   createRootSignatures();
   createSceneConstantBuffer();
+  createLightConstantBuffer();
   createPipeline();
 }
 
@@ -32,13 +33,14 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
 void SceneGraphViewerApp::createRootSignatures()
 {
   // graphics root signature
-  CD3DX12_ROOT_PARAMETER   rootParameter[5] = {};
+  CD3DX12_ROOT_PARAMETER   rootParameter[6] = {};
   CD3DX12_DESCRIPTOR_RANGE range            = {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 0};
   rootParameter[0].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);   // scene constant buffer
   rootParameter[1].InitAsConstants(32, 1, D3D12_ROOT_SIGNATURE_FLAG_NONE);        // mv matrix
   rootParameter[2].InitAsConstantBufferView(2, 0, D3D12_SHADER_VISIBILITY_PIXEL); // materials
   rootParameter[3].InitAsDescriptorTable(1, &range);                              // textures
   rootParameter[4].InitAsShaderResourceView(5);                                   // TLAS
+  rootParameter[5].InitAsConstantBufferView(3, 0, D3D12_SHADER_VISIBILITY_PIXEL); // point lights
 
   D3D12_STATIC_SAMPLER_DESC sampler = {};
   sampler.Filter                    = D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -166,9 +168,12 @@ void SceneGraphViewerApp::onDrawUI()
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
   ImGui::Checkbox("Use ray tracing", &m_uiData.m_useRayTracing);
-  ImGui::SliderFloat("Light direction x", &m_uiData.m_lightDirection.x, -1.0f, 1.0f);
-  ImGui::SliderFloat("Light direction y", &m_uiData.m_lightDirection.y, -1.0f, 1.0f);
-  ImGui::SliderFloat("Light direction z", &m_uiData.m_lightDirection.z, -1.0f, 1.0f);
+  ImGui::SliderFloat("Light1 direction x", &m_pointLights.at(0).direction.x, -1.0f, 1.0f);
+  ImGui::SliderFloat("Light1 direction y", &m_pointLights.at(0).direction.y, -1.0f, 1.0f);
+  ImGui::SliderFloat("Light1 direction z", &m_pointLights.at(0).direction.z, -1.0f, 1.0f);
+  ImGui::SliderFloat("Light2 direction x", &m_pointLights.at(1).direction.x, -1.0f, 1.0f);
+  ImGui::SliderFloat("Light2 direction y", &m_pointLights.at(1).direction.y, -1.0f, 1.0f);
+  ImGui::SliderFloat("Light2 direction z", &m_pointLights.at(1).direction.z, -1.0f, 1.0f);
   ImGui::SliderFloat("Shadow bias", &m_uiData.m_shadowBias, 0.0f, 5.0f);
 
   ImGui::End();
@@ -178,6 +183,7 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
 {
   const auto cameraMatrix = m_examinerController.getTransformationMatrix();
   updateSceneConstantBuffer();
+  updateLightConstantBuffer();
 
   //  Assignment 6 (normalize scene)
   const auto modelMatrix            = m_scene.getAABB().getNormalizationTransformation();
@@ -188,8 +194,10 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
   cmdLst->SetGraphicsRootSignature(m_graphicsRootSignature.Get());
 
   // set constant buffer
-  const auto sceneCb = constantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
+  const auto sceneCb = sceneConstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
   cmdLst->SetGraphicsRootConstantBufferView(0, sceneCb);
+  const auto lightCb = lightConstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
+  cmdLst->SetGraphicsRootConstantBufferView(5, lightCb);
 
   // ray tracing
   cmdLst->SetGraphicsRootShaderResourceView(4, m_rayTracingUtils.m_topLevelAS->GetGPUVirtualAddress());
@@ -211,16 +219,24 @@ struct SceneConstantBuffer
   ui8   flags;
 };
 
+struct PointLightConstantBuffer
+{
+  PointLight pointLights[2];
+  ui32        numPointLights;
+};
+
 } // namespace
+
+#pragma region Scene constant buffer
 
 void SceneGraphViewerApp::createSceneConstantBuffer()
 {
   const SceneConstantBuffer cb         = {};
   const auto                frameCount = getDX12AppConfig().frameCount;
-  constantBuffers.resize(frameCount);
+  sceneConstantBuffers.resize(frameCount);
   for (ui32 i = 0; i < frameCount; i++)
   {
-    constantBuffers[i] = ConstantBufferD3D12(cb, getDevice());
+    sceneConstantBuffers[i] = ConstantBufferD3D12(cb, getDevice());
   }
 }
 
@@ -234,13 +250,46 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
   // const auto sy = sin(glm::radians(m_uiData.m_lightAngles.y));
 
   // cb.lightDirection = f32v3(sx * cy, sx * sy, cx);
-  cb.lightDirection = m_uiData.m_lightDirection;
-  cb.shadowBias = m_uiData.m_shadowBias;
+  cb.shadowBias     = m_uiData.m_shadowBias;
   cb.flags          = m_uiData.m_useRayTracing & 0x1;
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
   // std::cout << "Projection is " << glm::to_string(cb.projectionMatrix) << std::endl;
-  constantBuffers[getFrameIndex()].upload(&cb);
+  sceneConstantBuffers[getFrameIndex()].upload(&cb);
 }
+
+#pragma endregion
+
+#pragma region Point Light Constant Buffer
+
+void SceneGraphViewerApp::createLightConstantBuffer()
+{
+  const PointLightConstantBuffer cb         = {};
+  const auto                     frameCount = getDX12AppConfig().frameCount;
+  lightConstantBuffers.resize(frameCount);
+  for (ui32 i = 0; i < frameCount; i++)
+  {
+    lightConstantBuffers[i] = ConstantBufferD3D12(cb, getDevice());
+  }
+
+  PointLight p1(f32v3(1.0f, 0.5f, 0.0f), 0.0f, f32v3(0.9f, 0.5f, 0.5f), 1.0f);
+  PointLight p2(f32v3(-1.0f, 0.5f, 0.0f), 0.0f, f32v3(0.5f, 0.5f, 0.9f), 1.0f);
+  m_pointLights.push_back(p1);
+  m_pointLights.push_back(p2);
+}
+
+void SceneGraphViewerApp::updateLightConstantBuffer()
+{
+  PointLightConstantBuffer cb;
+
+  cb.numPointLights = static_cast<ui32>(m_pointLights.size());
+  for (ui8 i = 0; i < m_pointLights.size(); i++)
+  {
+    cb.pointLights[i] = m_pointLights.at(i);
+  }
+  lightConstantBuffers[getFrameIndex()].upload(&cb);
+}
+
+#pragma endregion
 
 #pragma endregion

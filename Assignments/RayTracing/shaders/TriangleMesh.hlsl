@@ -10,13 +10,19 @@ struct VertexShaderOutput
     float2 texCoord : TEXCOORD;
 };
 
+struct PointLight
+{
+    float3 lightDirection;
+    float3 lightColor;
+    float lightIntensity;
+};
+
 /// <summary>
 /// Constants that can change every frame.
 /// </summary>
 cbuffer PerFrameConstants : register(b0)
 {
     float4x4 projectionMatrix;
-    float3 lightDirection;
     float shadowBias;
     uint1 flags;
 }
@@ -38,6 +44,12 @@ cbuffer Material : register(b2)
     float4 ambientColor;
     float4 diffuseColor;
     float4 specularColorAndExponent;
+}
+
+cbuffer LightBuffer : register(b3)
+{
+    PointLight light[2];
+    uint numLights;
 }
 
 Texture2D<float4> g_textureAmbient : register(t0);
@@ -75,45 +87,34 @@ VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, f
 float4 PS_main(VertexShaderOutput input)
     : SV_TARGET
 {
-    float3 lightDir = normalize(lightDirection);
+    //float3 lightDir = normalize(lightDirection);
     bool useRayTracing = (flags & 0x1);
-    float3 finalColor = float3(0.0, 0.0, 0.0); // Initialize output color
-    bool hit = false;
+    float3 finalColor = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor; // Initialize output color
     
     if (useRayTracing)
     {
-        finalColor = float3(0.0, 0.0, 1.0); // Miss color for ray tracing is blue
-        RayDesc ray;
-        ray.Origin = input.worldSpacePosition.xyz + shadowBias * normalize(input.viewSpaceNormal.xyz); // add shadow bias to avoid artifacts
-        ray.Direction = lightDir;
-        ray.TMin = 0.0001;
-        ray.TMax = 1e6;
-    
-        RayQuery < RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES > q;
-        q.TraceRayInline(TLAS, 0, 0xFF, ray);
-        float3 hitPosition = float3(0.0f, 0.0f, 0.0f);
-    
-        // traverse TLAS
-        q.Proceed();
-    
-        if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+        for (uint i = 0; i < 2; i++)
         {
-            hit = true;
+            PointLight l = light[i];
+            float3 lightDir = normalize(l.lightDirection);
+            RayDesc ray;
+            ray.Origin = input.worldSpacePosition.xyz + shadowBias * normalize(input.viewSpaceNormal.xyz); // add shadow bias to avoid artifacts
+            ray.Direction = lightDir;
+            ray.TMin = 0.0001;
+            ray.TMax = 1e6;
+
+            RayQuery < RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES > q;
+            q.TraceRayInline(TLAS, 0, 0xFF, ray);
+            float3 hitPosition = float3(0.0f, 0.0f, 0.0f);
+
+            // traverse TLAS
+            q.Proceed();
+
+            if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+            {
+                finalColor = float3(1.0f, 0.0f, 0.0f);
+            }
         }
-    }
-
-    //float n = normalize(input.viewSpaceNormal);
-    //float3 v = normalize(-input.viewSpacePosition);
-    //float3 h = normalize(lightDir + v);
-
-    //float f_diffuse = max(0.0f, dot(n, lightDir));
-
-    float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor;
-    finalColor = diffuse;
-    
-    if (hit) // is in shadow
-    {
-        finalColor *= 0.8f;
     }
 
     return float4(finalColor.xyz, 1.0f);
