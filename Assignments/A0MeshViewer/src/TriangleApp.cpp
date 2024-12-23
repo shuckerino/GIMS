@@ -189,6 +189,7 @@ void MeshViewer::createTexture()
   // upload texture to GPU memory
   UploadHelper uploadHelper(getDevice(), GetRequiredIntermediateSize(m_texture.Get(), 0, 1));
   uploadHelper.uploadTexture(image.get(), m_texture, textureWidth, textureHeight, getCommandQueue());
+  uploadHelper.uploadDefaultBuffer();
 
   D3D12_DESCRIPTOR_HEAP_DESC desc = {};
   desc.Type                       = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;

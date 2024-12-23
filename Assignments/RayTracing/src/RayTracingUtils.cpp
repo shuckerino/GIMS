@@ -5,22 +5,23 @@ namespace
 {
 #pragma region Helper functions
 
-// Check if can be replaced with UploadHelper
-inline void AllocateUploadBuffer(ID3D12Device* pDevice, void* pData, UINT64 datasize, ID3D12Resource** ppResource,
-                                 const wchar_t* resourceName = nullptr)
+inline void uploadDefaultBuffer(ComPtr<ID3D12Device5>& device, void* dataSrc, UINT64 datasize,
+                                ComPtr<ID3D12Resource>& dataDst, ComPtr<ID3D12CommandQueue> commandQueue,
+                                const wchar_t* resourceName = nullptr)
 {
-  auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-  auto bufferDesc           = CD3DX12_RESOURCE_DESC::Buffer(datasize);
-  throwIfFailed(pDevice->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &bufferDesc,
-                                                 D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(ppResource)));
+  const auto bufferDescription     = CD3DX12_RESOURCE_DESC::Buffer(datasize);
+  const auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+  device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bufferDescription,
+                                  D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&dataDst));
+
+  UploadHelper helper(device, datasize);
+  helper.uploadDefaultBuffer(dataSrc, dataDst, datasize, commandQueue);
+
   if (resourceName)
   {
-    (*ppResource)->SetName(resourceName);
+    dataDst->SetName(resourceName);
   }
-  void* pMappedData;
-  (*ppResource)->Map(0, nullptr, &pMappedData);
-  memcpy(pMappedData, pData, datasize);
-  (*ppResource)->Unmap(0, nullptr);
 }
 
 void AllocateUAVBuffer(ComPtr<ID3D12Device5> device, ui64 bufferSize, ID3D12Resource** ppResource,
@@ -55,14 +56,11 @@ void AllocateUAVBuffer(ComPtr<ID3D12Device5> device, ui64 bufferSize, ID3D12Reso
 RayTracingUtils RayTracingUtils::createRayTracingUtils(ComPtr<ID3D12Device5> device, Scene& scene,
                                                        ComPtr<ID3D12GraphicsCommandList4> commandList,
                                                        ComPtr<ID3D12CommandAllocator>     commandAllocator,
-                                                       ComPtr<ID3D12CommandQueue> commandQueue, ui32 vp_height,
-                                                       ui32 vp_width, SceneGraphViewerApp& app)
+                                                       ComPtr<ID3D12CommandQueue>         commandQueue,
+                                                       SceneGraphViewerApp&               app)
 {
   RayTracingUtils rayTracingUtils(device);
 
-  // rayTracingUtils.createOutputResource(device, vp_width, vp_height);
-  (void)vp_height;
-  (void)vp_width;
   rayTracingUtils.createAccelerationStructures(device, scene, commandList, commandAllocator, commandQueue, app);
 
   return rayTracingUtils;
@@ -149,11 +147,6 @@ void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device,
       continue;
     }
 
-    //if (currentNode.meshIndices.size() > 1)
-    //{
-    //  throw std::runtime_error("Only one mesh per node supported");
-    //}
-
     for (ui8 m = 0; m < currentNode.meshIndices.size(); m++)
     {
       const auto& currentMesh = scene.getMesh(currentNode.meshIndices.at(m));
@@ -234,9 +227,8 @@ void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device,
 
   // upload instance descriptions
   ComPtr<ID3D12Resource> instanceDescsBuffer;
-  AllocateUploadBuffer(device.Get(), instanceDescs.data(),
-                       sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescs.size(), &instanceDescsBuffer,
-                       L"InstanceDescs");
+  uploadDefaultBuffer(device, instanceDescs.data(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescs.size(),
+                      instanceDescsBuffer, commandQueue, L"InstanceDescs");
 
   // create TLAS
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};

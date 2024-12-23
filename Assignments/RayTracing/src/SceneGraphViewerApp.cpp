@@ -18,8 +18,7 @@ SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::
     , m_examinerController(true)
     , m_scene(SceneGraphFactory::createFromAssImpScene(pathToScene, getDevice(), getCommandQueue()))
     , m_rayTracingUtils(RayTracingUtils::createRayTracingUtils(getDevice(), m_scene, getCommandList(),
-                                                               getCommandAllocator(), getCommandQueue(), getHeight(),
-                                                               getWidth(), (*this)))
+                                                               getCommandAllocator(), getCommandQueue(), (*this)))
 {
   m_examinerController.setTranslationVector(f32v3(0, -0.25f, 1.5));
   m_uiData.m_useRayTracing = true;

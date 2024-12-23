@@ -12,6 +12,8 @@
 #include <unordered_map>
 #include <vector>
 
+using Microsoft::WRL::ComPtr;
+
 class SceneGraphViewerApp; // Forward declaration
 
 class RayTracingUtils
@@ -23,7 +25,7 @@ public:
   static RayTracingUtils createRayTracingUtils(ComPtr<ID3D12Device5> device, Scene& scene,
                                                ComPtr<ID3D12GraphicsCommandList4> commandList,
                                                ComPtr<ID3D12CommandAllocator>     commandAllocator,
-                                               ComPtr<ID3D12CommandQueue> commandQueue, ui32 vp_height, ui32 vp_width,
+                                               ComPtr<ID3D12CommandQueue> commandQueue,
                                                SceneGraphViewerApp& app);
 
   // Acceleration structure
