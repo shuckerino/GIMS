@@ -12,7 +12,7 @@ struct VertexShaderOutput
 
 struct PointLight
 {
-    float3 lightDirection;
+    float3 position;
     float3 lightColor;
     float lightIntensity;
 };
@@ -78,7 +78,6 @@ VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, f
     output.viewSpaceNormal = normal;
     output.clipSpacePosition = mul(projectionMatrix, p4);
     output.texCoord = texCoord;
-
     output.viewSpaceTangent = mul((float3x3) modelViewMatrix, tangent);
     output.viewSpaceBitangent = cross(output.viewSpaceNormal, output.viewSpaceTangent);
     return output;
@@ -88,15 +87,19 @@ float4 PS_main(VertexShaderOutput input)
     : SV_TARGET
 {
     //float3 lightDir = normalize(lightDirection);
-    bool useRayTracing = (flags & 0x1);
+    //bool useRayTracing = (flags & 0x1);
+    bool useRayTracing = true;
     float3 finalColor = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor; // Initialize output color
+    //float3 finalColor = float3(0.0f, 0.0f, 0.0f); // Initialize output color
     
     if (useRayTracing)
     {
         for (uint i = 0; i < 2; i++)
         {
             PointLight l = light[i];
-            float3 lightDir = normalize(l.lightDirection);
+            float3 lightDir = normalize(l.position - input.worldSpacePosition.xyz);
+            //float distance = length(l.position - input.worldSpacePosition.xyz);
+            //float attenuation = 1.0 / (1.0 + attenuationFactor * distance * distance);
             RayDesc ray;
             ray.Origin = input.worldSpacePosition.xyz + shadowBias * normalize(input.viewSpaceNormal.xyz); // add shadow bias to avoid artifacts
             ray.Direction = lightDir;
@@ -105,14 +108,13 @@ float4 PS_main(VertexShaderOutput input)
 
             RayQuery < RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES > q;
             q.TraceRayInline(TLAS, 0, 0xFF, ray);
-            float3 hitPosition = float3(0.0f, 0.0f, 0.0f);
 
             // traverse TLAS
             q.Proceed();
 
             if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
             {
-                finalColor = float3(1.0f, 0.0f, 0.0f);
+                finalColor *= 0.1f;
             }
         }
     }
