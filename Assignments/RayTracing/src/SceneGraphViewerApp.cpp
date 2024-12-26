@@ -168,12 +168,12 @@ void SceneGraphViewerApp::onDrawUI()
   ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
   ImGui::Checkbox("Use ray tracing", &m_uiData.m_useRayTracing);
-  ImGui::SliderFloat("Light1 direction x", &m_pointLights.at(0).direction.x, -1.0f, 1.0f);
-  ImGui::SliderFloat("Light1 direction y", &m_pointLights.at(0).direction.y, -1.0f, 1.0f);
-  ImGui::SliderFloat("Light1 direction z", &m_pointLights.at(0).direction.z, -1.0f, 1.0f);
-  ImGui::SliderFloat("Light2 direction x", &m_pointLights.at(1).direction.x, -1.0f, 1.0f);
-  ImGui::SliderFloat("Light2 direction y", &m_pointLights.at(1).direction.y, -1.0f, 1.0f);
-  ImGui::SliderFloat("Light2 direction z", &m_pointLights.at(1).direction.z, -1.0f, 1.0f);
+  ImGui::SliderFloat("Light1 direction x", &m_pointLights.at(0).direction.x, -100.0f, 100.0f);
+  ImGui::SliderFloat("Light1 direction y", &m_pointLights.at(0).direction.y, -100.0f, 100.0f);
+  ImGui::SliderFloat("Light1 direction z", &m_pointLights.at(0).direction.z, -100.0f, 100.0f);
+  ImGui::SliderFloat("Light2 direction x", &m_pointLights.at(1).direction.x, -100.0f, 100.0f);
+  ImGui::SliderFloat("Light2 direction y", &m_pointLights.at(1).direction.y, -100.0f, 100.0f);
+  ImGui::SliderFloat("Light2 direction z", &m_pointLights.at(1).direction.z, -100.0f, 100.0f);
   ImGui::SliderFloat("Shadow bias", &m_uiData.m_shadowBias, 0.0f, 5.0f);
 
   ImGui::End();
