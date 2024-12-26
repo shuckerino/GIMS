@@ -16,7 +16,8 @@ struct VertexShaderOutput
 cbuffer PerFrameConstants : register(b0)
 {
     float4x4 projectionMatrix;
-    float3 lightDirection;
+    float3 lightPosition;
+    float lightIntensity;
     float shadowBias;
     uint1 flags;
 }
@@ -75,9 +76,13 @@ VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, f
 float4 PS_main(VertexShaderOutput input)
     : SV_TARGET
 {
-    float3 lightDir = normalize(lightDirection);
+    
+    float3 lightDir = normalize(lightPosition - input.worldSpacePosition.xyz);
+    float distance = length(lightPosition - input.worldSpacePosition.xyz);
+    float lightIntensity = 50.0f;
+    float attenuation = 1.0 / distance;
     bool useRayTracing = (flags & 0x1);
-    float3 finalColor = float3(0.0, 0.0, 0.0); // Initialize output color
+    float3 finalColor = float3(0.0, 0.0, 1.0); // Initialize output color
     bool hit = false;
     
     if (useRayTracing)
@@ -108,12 +113,23 @@ float4 PS_main(VertexShaderOutput input)
 
     //float f_diffuse = max(0.0f, dot(n, lightDir));
 
-    float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor;
-    finalColor = diffuse;
+    //float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor;
+    //finalColor = diffuse * attenuation;
+    
+    // Calculate diffuse lighting
+    float nDotL = max(0.0f, dot(normalize(input.viewSpaceNormal), lightDir));
+    float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor * nDotL;
+
+    // Apply attenuation
+    diffuse *= attenuation * lightIntensity;
+
+    finalColor = diffuse.xyz;
     
     if (hit) // is in shadow
     {
         finalColor *= 0.8f;
+        //finalColor = float3(1.0, 0.0, 0.0); // Initialize output color
+        
     }
 
     return float4(finalColor.xyz, 1.0f);

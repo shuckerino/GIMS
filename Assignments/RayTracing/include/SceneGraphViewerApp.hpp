@@ -58,7 +58,8 @@ private:
   {
     f32v3 m_backgroundColor = f32v3(0.25f, 0.25f, 0.25f);
     f32v2 m_lightAngles     = f32v2(0.0f, 0.0f);
-    f32v3 m_lightDirection  = f32v3(0.0f, 0.0f, -1.0f);
+    f32v3 m_lightPosition  = f32v3(5.0f, 10.0f, -5.0f);
+    f32 m_lightIntensity  = 1.0f;
     bool  m_useRayTracing;
     f32   m_shadowBias = 0.0001f;
   };
