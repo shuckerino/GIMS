@@ -89,10 +89,10 @@ float4 PS_main(VertexShaderOutput input)
 {
     float3 accumulatedLightContribution = float3(0.0, 0.0, 0.0); // Initialize output color
     
-    for (uint i = 0; i < 1; i++)
+    for (uint i = 0; i < numLights; i++)
     {
-        float3 testPos = lightPosition;
         PointLight l = light[i];
+        float3 testPos = l.position;
         float3 lightDir = normalize(testPos - input.worldSpacePosition.xyz);
         float distance = length(testPos - input.worldSpacePosition.xyz);
         float lightIntensity = 50.0f;
@@ -100,8 +100,11 @@ float4 PS_main(VertexShaderOutput input)
         float nDotL = max(0.0f, dot(normalize(input.viewSpaceNormal), lightDir));
         float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor * nDotL;
 
-            // Apply attenuation
-        diffuse *= attenuation * lightIntensity;
+        // Apply attenuation
+        diffuse *= attenuation * l.lightIntensity;
+        
+        // apply light color
+        diffuse *= float4(l.lightColor.xyz, 1.0f);
 
         float3 currentLightContribution = diffuse.xyz;
             
