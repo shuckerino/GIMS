@@ -88,7 +88,7 @@ float4 PS_main(VertexShaderOutput input)
 {
     float3 accumulatedLightContribution = float3(0.0, 0.0, 0.0); // Initialize output color
     
-    for (uint i = 0; i < numLights; i++)
+    for (uint i = 0; i < 1; i++)
     {
         PointLight l = light[i];
         float3 lightDir = normalize(l.position - input.worldSpacePosition.xyz);
@@ -96,8 +96,7 @@ float4 PS_main(VertexShaderOutput input)
         float lightIntensity = 50.0f;
         float attenuation = 1.0 / distance;
             
-        float nDotL = max(0.0f, dot(normalize(input.viewSpaceNormal), lightDir));
-        float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor * nDotL;
+        float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor;
 
             // Apply attenuation
         diffuse *= attenuation * lightIntensity;
@@ -108,17 +107,26 @@ float4 PS_main(VertexShaderOutput input)
         ray.Origin = input.worldSpacePosition.xyz + shadowBias * normalize(input.viewSpaceNormal.xyz); // add shadow bias to avoid artifacts
         ray.Direction = lightDir;
         ray.TMin = 0.0001;
-        ray.TMax = 1e6;
+        ray.TMax = distance;
 
         RayQuery < RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES > q;
         q.TraceRayInline(TLAS, 0, 0xFF, ray);
 
-            // traverse TLAS
-        q.Proceed();
-
-        if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+        // Traverse TLAS
+        bool hit = false; // Track if any hit is committed
+        while (q.Proceed())
         {
-            currentLightContribution *= 0.8f;
+            if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+            {
+                hit = true;
+                break; // Exit early on first hit
+            }
+        }
+
+        if (hit)
+        {
+            //currentLightContribution *= 0.8f;
+            accumulatedLightContribution = float3(1.0f, 0.0f, 0.0f);
         }
         accumulatedLightContribution += currentLightContribution;
     }

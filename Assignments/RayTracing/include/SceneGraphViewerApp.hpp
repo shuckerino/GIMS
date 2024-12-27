@@ -9,7 +9,7 @@ using namespace gims;
 
 struct PointLight
 {
-  f32v3 direction;
+  f32 position[3];
   f32 padding1; // 4 bytes to align to 16 bytes
   f32v3 color;
   f32   intensity;

@@ -160,19 +160,54 @@ void SceneGraphViewerApp::onDrawUI()
   }
 
   const auto imGuiFlags = m_examinerController.active() ? ImGuiWindowFlags_NoInputs : ImGuiWindowFlags_None;
-  ImGui::Begin("Information", nullptr, imGuiFlags);
+  ImGui::Begin("Controls", nullptr, imGuiFlags);
   ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
   ImGui::Text("Million Primary Rays/s: %f", m_numRaysPerSecond);
-  ImGui::End();
-  ImGui::Begin("Configuration", nullptr, imGuiFlags);
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
-  ImGui::SliderFloat("Light1 direction x", &m_pointLights.at(0).direction.x, -100.0f, 100.0f);
-  ImGui::SliderFloat("Light1 direction y", &m_pointLights.at(0).direction.y, -100.0f, 100.0f);
-  ImGui::SliderFloat("Light1 direction z", &m_pointLights.at(0).direction.z, -100.0f, 100.0f);
-  ImGui::SliderFloat("Light2 direction x", &m_pointLights.at(1).direction.x, -100.0f, 100.0f);
-  ImGui::SliderFloat("Light2 direction y", &m_pointLights.at(1).direction.y, -100.0f, 100.0f);
-  ImGui::SliderFloat("Light2 direction z", &m_pointLights.at(1).direction.z, -100.0f, 100.0f);
   ImGui::SliderFloat("Shadow bias", &m_uiData.m_shadowBias, 0.0f, 5.0f);
+
+  static i8 selectedLight = -1;
+  // List existing lights
+  if (ImGui::TreeNode("Point Lights"))
+  {
+    for (i8 i = 0; i < m_pointLights.size(); ++i)
+    {
+      ImGui::PushID(static_cast<int>(i));
+      if (ImGui::Selectable(("Light " + std::to_string(i)).c_str(), selectedLight == i))
+      {
+        selectedLight = i;
+      }
+      ImGui::PopID();
+    }
+    ImGui::TreePop();
+  }
+  // Add/Remove Lights
+  if (ImGui::Button("Add Light"))
+  {
+    PointLight newLight;
+    newLight.position[0] = 0.0f;
+    newLight.position[1] = 0.0f;
+    newLight.position[2] = 0.0f;
+    newLight.color       = f32v3(1.0f, 1.0f, 1.0f);
+    newLight.intensity   = 1.0f;
+    m_pointLights.push_back(newLight);
+  }
+  if (selectedLight >= 0 && selectedLight < m_pointLights.size())
+  {
+    if (ImGui::Button("Remove Selected Light"))
+    {
+      m_pointLights.erase(m_pointLights.begin() + selectedLight);
+      selectedLight = -1;
+    }
+  }
+
+  // Edit Selected Light
+  if (selectedLight >= 0 && selectedLight < m_pointLights.size())
+  {
+    PointLight& light = m_pointLights[selectedLight];
+    ImGui::DragFloat3("Position", light.position, 0.5f, -100.0f, 100.0f, "%.3f", ImGuiSliderFlags_None);
+    ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 10.0f);
+  }
 
   ImGui::End();
 }
@@ -220,7 +255,7 @@ struct SceneConstantBuffer
 struct PointLightConstantBuffer
 {
   PointLight pointLights[2];
-  ui32        numPointLights;
+  ui32       numPointLights;
 };
 
 } // namespace
@@ -248,7 +283,7 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
   // const auto sy = sin(glm::radians(m_uiData.m_lightAngles.y));
 
   // cb.lightDirection = f32v3(sx * cy, sx * sy, cx);
-  cb.shadowBias     = m_uiData.m_shadowBias;
+  cb.shadowBias = m_uiData.m_shadowBias;
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
   // std::cout << "Projection is " << glm::to_string(cb.projectionMatrix) << std::endl;
@@ -269,8 +304,20 @@ void SceneGraphViewerApp::createLightConstantBuffer()
     lightConstantBuffers[i] = ConstantBufferD3D12(cb, getDevice());
   }
 
-  PointLight p1(f32v3(1.0f, 0.5f, 0.0f), 0.0f, f32v3(0.9f, 0.5f, 0.5f), 1.0f);
-  PointLight p2(f32v3(-1.0f, 0.5f, 0.0f), 0.0f, f32v3(0.5f, 0.5f, 0.9f), 1.0f);
+  PointLight p1;
+  p1.position[0] = 1.0f;
+  p1.position[1] = 0.5f;
+  p1.position[2] = 0.0f;
+  p1.color     = f32v3(1.0f, 0.5f, 0.5f);
+  p1.intensity = 1.0f;
+
+  PointLight p2;
+  p2.position[0] = -1.0f;
+  p2.position[1] = 0.5f;
+  p2.position[2] = 0.0f;
+  p2.color     = f32v3(1.0f, 0.5f, 0.5f);
+  p2.intensity = 1.0f;
+ 
   m_pointLights.push_back(p1);
   m_pointLights.push_back(p2);
 }
