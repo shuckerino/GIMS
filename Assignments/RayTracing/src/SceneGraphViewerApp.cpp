@@ -165,6 +165,9 @@ void SceneGraphViewerApp::onDrawUI()
   ImGui::Text("Million Primary Rays/s: %f", m_numRaysPerSecond);
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
   ImGui::SliderFloat("Shadow bias", &m_uiData.m_shadowBias, 0.0f, 5.0f);
+  ImGui::SliderFloat("Light pos x", &m_uiData.m_lightPosition.x, -100.0f, 100.0f);
+  ImGui::SliderFloat("Light pos y", &m_uiData.m_lightPosition.y, -100.0f, 100.0f);
+  ImGui::SliderFloat("Light pos z", &m_uiData.m_lightPosition.z, -100.0f, 100.0f);
 
   static i8 selectedLight = -1;
   // List existing lights
@@ -247,7 +250,7 @@ namespace
 struct SceneConstantBuffer
 {
   f32m4 projectionMatrix;
-  f32v3 lightDirection;
+  f32v3 lightPosition;
   f32   shadowBias;
   ui8   flags;
 };
@@ -284,6 +287,7 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
 
   // cb.lightDirection = f32v3(sx * cy, sx * sy, cx);
   cb.shadowBias = m_uiData.m_shadowBias;
+  cb.lightPosition = m_uiData.m_lightPosition;
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
   // std::cout << "Projection is " << glm::to_string(cb.projectionMatrix) << std::endl;

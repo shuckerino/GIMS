@@ -67,6 +67,7 @@ private:
   struct UiData
   {
     f32v3 m_backgroundColor = f32v3(0.25f, 0.25f, 0.25f);
+    f32v3 m_lightPosition = f32v3(0.25f, 0.25f, 0.25f);
     f32   m_shadowBias = 0.0001f;
   };
 
