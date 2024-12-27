@@ -98,8 +98,9 @@ float4 PS_main(VertexShaderOutput input)
         {
             PointLight l = light[i];
             float3 lightDir = normalize(l.position - input.worldSpacePosition.xyz);
-            //float distance = length(l.position - input.worldSpacePosition.xyz);
-            //float attenuation = 1.0 / (1.0 + attenuationFactor * distance * distance);
+            float distance = length(l.position - input.worldSpacePosition.xyz);
+            float lightIntensity = 50.0f;
+            float attenuation = 1.0 / distance;
             RayDesc ray;
             ray.Origin = input.worldSpacePosition.xyz + shadowBias * normalize(input.viewSpaceNormal.xyz); // add shadow bias to avoid artifacts
             ray.Direction = lightDir;
