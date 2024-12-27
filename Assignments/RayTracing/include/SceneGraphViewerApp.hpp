@@ -67,7 +67,6 @@ private:
   struct UiData
   {
     f32v3 m_backgroundColor = f32v3(0.25f, 0.25f, 0.25f);
-    bool  m_useRayTracing;
     f32   m_shadowBias = 0.0001f;
   };
 
