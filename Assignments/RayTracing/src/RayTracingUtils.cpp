@@ -3,56 +3,28 @@
 
 namespace
 {
-// Assign a name to the object to aid with debugging.
-#if defined(_DEBUG) || defined(DBG)
-inline void SetName(ID3D12Object* pObject, LPCWSTR name)
-{
-  pObject->SetName(name);
-}
-inline void SetNameIndexed(ID3D12Object* pObject, LPCWSTR name, UINT index)
-{
-  WCHAR fullName[50];
-  if (swprintf_s(fullName, L"%s[%u]", name, index) > 0)
-  {
-    pObject->SetName(fullName);
-  }
-}
-#else
-inline void SetName(ID3D12Object*, LPCWSTR)
-{
-}
-inline void SetNameIndexed(ID3D12Object*, LPCWSTR, UINT)
-{
-}
-#endif
-
-// Naming helper for ComPtr<T>.
-// Assigns the name of the variable as the name of the object.
-// The indexed variant will include the index in the name of the object.
-#define NAME_D3D12_OBJECT(x)            SetName((x).Get(), L#x)
-#define NAME_D3D12_OBJECT_INDEXED(x, n) SetNameIndexed((x)[n].Get(), L#x, n)
-
 #pragma region Helper functions
 
-// Check if can be replaced with UploadHelper
-inline void AllocateUploadBuffer(ID3D12Device* pDevice, void* pData, UINT64 datasize, ID3D12Resource** ppResource,
-                                 const wchar_t* resourceName = nullptr)
+inline void uploadDefaultBuffer(ComPtr<ID3D12Device5>& device, void* dataSrc, UINT64 datasize,
+                                ComPtr<ID3D12Resource>& dataDst, ComPtr<ID3D12CommandQueue> commandQueue,
+                                const wchar_t* resourceName = nullptr)
 {
-  auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-  auto bufferDesc           = CD3DX12_RESOURCE_DESC::Buffer(datasize);
-  throwIfFailed(pDevice->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &bufferDesc,
-                                                 D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(ppResource)));
+  const auto bufferDescription     = CD3DX12_RESOURCE_DESC::Buffer(datasize);
+  const auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+  device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bufferDescription,
+                                  D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&dataDst));
+
+  UploadHelper helper(device, datasize);
+  helper.uploadDefaultBuffer(dataSrc, dataDst, datasize, commandQueue);
+
   if (resourceName)
   {
-    (*ppResource)->SetName(resourceName);
+    dataDst->SetName(resourceName);
   }
-  void* pMappedData;
-  (*ppResource)->Map(0, nullptr, &pMappedData);
-  memcpy(pMappedData, pData, datasize);
-  (*ppResource)->Unmap(0, nullptr);
 }
 
-void AllocateUAVBuffer(ComPtr<ID3D12Device5> device, ui64 bufferSize, ID3D12Resource** ppResource,
+inline void allocateUAVBuffer(ComPtr<ID3D12Device5> device, ui64 bufferSize, ID3D12Resource** ppResource,
                        D3D12_RESOURCE_STATES initialResourceState, const wchar_t* resourceName)
 {
   D3D12_RESOURCE_DESC desc = {};
@@ -84,14 +56,11 @@ void AllocateUAVBuffer(ComPtr<ID3D12Device5> device, ui64 bufferSize, ID3D12Reso
 RayTracingUtils RayTracingUtils::createRayTracingUtils(ComPtr<ID3D12Device5> device, Scene& scene,
                                                        ComPtr<ID3D12GraphicsCommandList4> commandList,
                                                        ComPtr<ID3D12CommandAllocator>     commandAllocator,
-                                                       ComPtr<ID3D12CommandQueue> commandQueue, ui32 vp_height,
-                                                       ui32 vp_width, SceneGraphViewerApp& app)
+                                                       ComPtr<ID3D12CommandQueue>         commandQueue,
+                                                       SceneGraphViewerApp&               app)
 {
   RayTracingUtils rayTracingUtils(device);
 
-  // rayTracingUtils.createOutputResource(device, vp_width, vp_height);
-  (void)vp_height;
-  (void)vp_width;
   rayTracingUtils.createAccelerationStructures(device, scene, commandList, commandAllocator, commandQueue, app);
 
   return rayTracingUtils;
@@ -163,77 +132,103 @@ void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device,
   // Reset the command list for the acceleration structure construction.
   commandList->Reset(commandAllocator.Get(), nullptr);
   const ui32 numMeshes = scene.getNumberOfMeshes();
+  const ui32 numNodes  = scene.getNumberOfNodes();
 
   // Build all BLAS for scene
   std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instanceDescs;
   std::vector<ComPtr<ID3D12Resource>>         scratchResources; // Keep scratch resources alive
   instanceDescs.reserve(numMeshes);
 
-  for (ui16 i = 0; i < numMeshes; i++)
+  for (ui16 i = 0; i < numNodes; i++)
   {
-    //  Create geometry description for each mesh
-    D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
-    geometryDesc.Type                           = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-    geometryDesc.Triangles.IndexBuffer          = scene.getMesh(i).getIndexBuffer()->GetGPUVirtualAddress();
-    geometryDesc.Triangles.IndexCount =
-        static_cast<ui32>(scene.getMesh(i).getIndexBuffer()->GetDesc().Width) / sizeof(ui32);
-    geometryDesc.Triangles.IndexFormat  = DXGI_FORMAT_R32_UINT;
-    geometryDesc.Triangles.Transform3x4 = 0;
-    geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-    geometryDesc.Triangles.VertexCount =
-        static_cast<ui32>(scene.getMesh(i).getVertexBuffer()->GetDesc().Width) / sizeof(Vertex);
-    geometryDesc.Triangles.VertexBuffer.StartAddress  = scene.getMesh(i).getVertexBuffer()->GetGPUVirtualAddress();
-    geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
-    geometryDesc.Flags                                = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+    const auto& currentNode = scene.getNode(i);
+    if (currentNode.meshIndices.empty())
+    {
+      continue;
+    }
 
-    // Create BLAS for each mesh
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = {};
-    bottomLevelInputs.Type           = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-    bottomLevelInputs.DescsLayout    = D3D12_ELEMENTS_LAYOUT_ARRAY;
-    bottomLevelInputs.Flags          = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-    bottomLevelInputs.NumDescs       = 1;
-    bottomLevelInputs.pGeometryDescs = &geometryDesc;
+    for (ui8 m = 0; m < currentNode.meshIndices.size(); m++)
+    {
+      const auto& currentMesh = scene.getMesh(currentNode.meshIndices.at(m));
 
-    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
-    device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-    throwIfZero(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
+      //  Create geometry description for each mesh
+      D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
+      geometryDesc.Type                           = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+      geometryDesc.Triangles.IndexBuffer          = currentMesh.getIndexBuffer()->GetGPUVirtualAddress();
+      geometryDesc.Triangles.IndexCount =
+          static_cast<ui32>(currentMesh.getIndexBuffer()->GetDesc().Width) / sizeof(ui32);
+      geometryDesc.Triangles.IndexFormat  = DXGI_FORMAT_R32_UINT;
+      geometryDesc.Triangles.Transform3x4 = 0;
+      geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+      geometryDesc.Triangles.VertexCount =
+          static_cast<ui32>(currentMesh.getVertexBuffer()->GetDesc().Width) / sizeof(Vertex);
+      geometryDesc.Triangles.VertexBuffer.StartAddress  = currentMesh.getVertexBuffer()->GetGPUVirtualAddress();
+      geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
+      geometryDesc.Flags                                = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
-    // Create scratch buffer
-    ComPtr<ID3D12Resource> scratchResource;
-    AllocateUAVBuffer(device, bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &scratchResource,
-                      D3D12_RESOURCE_STATE_COMMON, L"BLAS_ScratchResource");
-    scratchResources.push_back(scratchResource);
+      // Create BLAS for each mesh
+      D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = {};
+      bottomLevelInputs.Type           = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+      bottomLevelInputs.DescsLayout    = D3D12_ELEMENTS_LAYOUT_ARRAY;
+      bottomLevelInputs.Flags          = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+      bottomLevelInputs.NumDescs       = 1;
+      bottomLevelInputs.pGeometryDescs = &geometryDesc;
 
-    ComPtr<ID3D12Resource> blasResource;
-    AllocateUAVBuffer(device, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &blasResource,
-                      D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"BottomLevelAccelerationStructure");
-    m_bottomLevelAS.push_back(blasResource);
+      D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
+      device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+      throwIfZero(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
-    // Bottom Level Acceleration Structure desc
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
-    bottomLevelBuildDesc.Inputs                                             = bottomLevelInputs;
-    bottomLevelBuildDesc.ScratchAccelerationStructureData                   = scratchResource->GetGPUVirtualAddress();
-    bottomLevelBuildDesc.DestAccelerationStructureData = m_bottomLevelAS.at(i)->GetGPUVirtualAddress();
+      // Create scratch buffer
+      ComPtr<ID3D12Resource> scratchResource;
+      allocateUAVBuffer(device, bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &scratchResource,
+                        D3D12_RESOURCE_STATE_COMMON, L"BLAS_ScratchResource");
+      scratchResources.push_back(scratchResource);
 
-    commandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-    auto uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAS.at(i).Get());
-    commandList->ResourceBarrier(1, &uavBarrier);
+      ComPtr<ID3D12Resource> blasResource;
+      allocateUAVBuffer(device, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &blasResource,
+                        D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"BottomLevelAccelerationStructure");
+      m_bottomLevelAS.push_back(blasResource);
+      const ui8 index = static_cast<ui8>(m_bottomLevelAS.size() - 1);
 
-    // create instance description for each BLAS
-    D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
-    instanceDesc.Transform[0][0]                = 1.0f;
-    instanceDesc.Transform[1][1]                = 1.0f;
-    instanceDesc.Transform[2][2]                = 1.0f;
-    instanceDesc.InstanceMask                   = 1;
-    instanceDesc.AccelerationStructure          = m_bottomLevelAS.at(i)->GetGPUVirtualAddress();
-    instanceDescs.push_back(instanceDesc);
+      // Bottom Level Acceleration Structure desc
+      D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
+      bottomLevelBuildDesc.Inputs                                             = bottomLevelInputs;
+      bottomLevelBuildDesc.ScratchAccelerationStructureData                   = scratchResource->GetGPUVirtualAddress();
+      bottomLevelBuildDesc.DestAccelerationStructureData = m_bottomLevelAS.at(index)->GetGPUVirtualAddress();
+
+      commandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+      auto uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAS.at(index).Get());
+      commandList->ResourceBarrier(1, &uavBarrier);
+
+      // transpose to match the row-major order of DirectX
+      const auto worldSpaceTransformation = glm::transpose(currentNode.worldSpaceTransformation);
+
+      // create instance description for each BLAS
+      D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
+      instanceDesc.Transform[0][0]                = worldSpaceTransformation[0][0];
+      instanceDesc.Transform[0][1]                = worldSpaceTransformation[0][1];
+      instanceDesc.Transform[0][2]                = worldSpaceTransformation[0][2];
+      instanceDesc.Transform[0][3]                = worldSpaceTransformation[0][3];
+
+      instanceDesc.Transform[1][0] = worldSpaceTransformation[1][0];
+      instanceDesc.Transform[1][1] = worldSpaceTransformation[1][1];
+      instanceDesc.Transform[1][2] = worldSpaceTransformation[1][2];
+      instanceDesc.Transform[1][3] = worldSpaceTransformation[1][3];
+
+      instanceDesc.Transform[2][0]       = worldSpaceTransformation[2][0];
+      instanceDesc.Transform[2][1]       = worldSpaceTransformation[2][1];
+      instanceDesc.Transform[2][2]       = worldSpaceTransformation[2][2];
+      instanceDesc.Transform[2][3]       = worldSpaceTransformation[2][3];
+      instanceDesc.InstanceMask          = 1;
+      instanceDesc.AccelerationStructure = m_bottomLevelAS.at(index)->GetGPUVirtualAddress();
+      instanceDescs.push_back(instanceDesc);
+    }
   }
 
   // upload instance descriptions
   ComPtr<ID3D12Resource> instanceDescsBuffer;
-  AllocateUploadBuffer(device.Get(), instanceDescs.data(),
-                       sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescs.size(), &instanceDescsBuffer,
-                       L"InstanceDescs");
+  uploadDefaultBuffer(device, instanceDescs.data(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescs.size(),
+                      instanceDescsBuffer, commandQueue, L"InstanceDescs");
 
   // create TLAS
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};
@@ -247,12 +242,11 @@ void RayTracingUtils::createAccelerationStructures(ComPtr<ID3D12Device5> device,
   device->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
   throwIfZero(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
 
-   ComPtr<ID3D12Resource> topLevelScratchResource;
-  AllocateUAVBuffer(device, topLevelPrebuildInfo.ScratchDataSizeInBytes, &topLevelScratchResource,
-                    D3D12_RESOURCE_STATE_COMMON,
-                    L"TLAS_ScratchResource");
+  ComPtr<ID3D12Resource> topLevelScratchResource;
+  allocateUAVBuffer(device, topLevelPrebuildInfo.ScratchDataSizeInBytes, &topLevelScratchResource,
+                    D3D12_RESOURCE_STATE_COMMON, L"TLAS_ScratchResource");
 
-  AllocateUAVBuffer(device, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_topLevelAS,
+  allocateUAVBuffer(device, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_topLevelAS,
                     D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"TopLevelAccelerationStructure");
 
   // Top Level Acceleration Structure desc

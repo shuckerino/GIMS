@@ -156,7 +156,8 @@ Scene SceneGraphFactory::createFromAssImpScene(const std::filesystem::path      
 
   createMeshes(inputScene, device, commandQueue, outputScene);
 
-  createNodes(inputScene, outputScene, inputScene->mRootNode);
+  f32m4 identity = glm::identity<f32m4>();
+  createNodes(inputScene, outputScene, inputScene->mRootNode, identity);
 
   std::cout << outputScene.m_nodes.size() << std::endl;
 
@@ -263,7 +264,8 @@ void SceneGraphFactory::createMeshes(aiScene const* const inputScene, const ComP
   }
 }
 
-ui32 SceneGraphFactory::createNodes(aiScene const* const inputScene, Scene& outputScene, aiNode const* const assimpNode)
+ui32 SceneGraphFactory::createNodes(aiScene const* const inputScene, Scene& outputScene, aiNode const* const assimpNode,
+                                    f32m4 worldSpaceTransformation)
 {
   (void)inputScene;
 
@@ -276,6 +278,8 @@ ui32 SceneGraphFactory::createNodes(aiScene const* const inputScene, Scene& outp
   const aiMatrix4x4 parentRelativeTransformation = assimpNode->mTransformation;
   glm::mat4         convertedAssimpTrafo         = aiMatrix4x4ToGlm(parentRelativeTransformation);
   currentNode.transformation                     = convertedAssimpTrafo;
+  worldSpaceTransformation                       = worldSpaceTransformation * convertedAssimpTrafo;
+  currentNode.worldSpaceTransformation           = worldSpaceTransformation;
 
   // set mesh indices
   for (ui32 i = 0; i < assimpNode->mNumMeshes; i++)
@@ -287,7 +291,7 @@ ui32 SceneGraphFactory::createNodes(aiScene const* const inputScene, Scene& outp
   aiNode** childrenOfInputNode = assimpNode->mChildren;
   for (ui32 i = 0; i < assimpNode->mNumChildren; i++)
   {
-    const ui32 childNodeIndex = createNodes(inputScene, outputScene, childrenOfInputNode[i]);
+    const ui32 childNodeIndex = createNodes(inputScene, outputScene, childrenOfInputNode[i], worldSpaceTransformation);
     outputScene.m_nodes.at(currentNodeIndex).childIndices.emplace_back(childNodeIndex);
   }
 

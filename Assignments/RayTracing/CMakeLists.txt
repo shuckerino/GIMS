@@ -15,7 +15,8 @@ set(SOURCES "./src/main.cpp"
 								"./include/TriangleMeshD3D12.hpp" 								
 								"./include/Texture2DD3D12.hpp" 								
 								"./include/SceneGraphViewerApp.hpp"
-								"./include/ConstantBufferD3D12.hpp")
+								"./include/ConstantBufferD3D12.hpp"
+								"./include/StepTimer.h")
 
 set(SHADERS "./shaders/TriangleMesh.hlsl")
 create_app(RayTracing "${SOURCES}" "${SHADERS}")

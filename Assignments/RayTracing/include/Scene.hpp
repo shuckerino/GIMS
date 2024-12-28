@@ -30,6 +30,7 @@ public:
   struct Node
   {
     f32m4             transformation; //! Transformation to parent node.
+    f32m4             worldSpaceTransformation; //! Transformation into world space
     std::vector<ui32> meshIndices;    //! Index in the array of meshIndices, i.e., Scene::m_meshes[].
     std::vector<ui32> childIndices;   //! Index in the array of nodes, i.e.,Scene::m_nodes[].
   };
@@ -113,7 +114,7 @@ public:
   /// <param name="srvRootParameterIdx">In your root signature the paramer index of the Shader-Resource-View For the
   /// textures.</param>
   void addToCommandList(const ComPtr<ID3D12GraphicsCommandList>& commandList, const f32m4 modelView,
-                        const f32m4 modelMatrix, ui32 modelViewRootParameterIdx, ui32 materialConstantsRootParameterIdx,
+                        ui32 modelViewRootParameterIdx, ui32 materialConstantsRootParameterIdx,
                         ui32 srvRootParameterIdx);
 
   // Allow the class SceneGraphFactor access to the private members.

@@ -1,10 +1,19 @@
 #pragma once
 #include "RayTracingUtils.hpp"
 #include "Scene.hpp"
+#include "StepTimer.h"
 #include <gimslib/d3d/DX12App.hpp>
 #include <gimslib/types.hpp>
 #include <gimslib/ui/ExaminerController.hpp>
 using namespace gims;
+
+struct PointLight
+{
+  f32 position[3];
+  f32 padding1; // 4 bytes to align to 16 bytes
+  f32v3 color;
+  f32   intensity;
+};
 
 /// <summary>
 /// An app for viewing an Asset Importer Scene Graph.
@@ -49,18 +58,23 @@ private:
 
   void createSceneConstantBuffer();
   void updateSceneConstantBuffer();
+  void createLightConstantBuffer();
+  void updateLightConstantBuffer();
+
+  StepTimer m_timer;
+  f32       m_numRaysPerSecond;
 
   struct UiData
   {
     f32v3 m_backgroundColor = f32v3(0.25f, 0.25f, 0.25f);
-    f32v2 m_lightAngles     = f32v2(0.0f, 0.0f);
-    f32v3 m_lightDirection     = f32v3(0.0f, 0.0f, -1.0f);
-    bool  m_useRayTracing;
+    f32   m_shadowBias = 0.0001f;
   };
 
   ComPtr<ID3D12PipelineState>      m_pipelineState;
   ComPtr<ID3D12RootSignature>      m_graphicsRootSignature;
-  std::vector<ConstantBufferD3D12> constantBuffers;
+  std::vector<ConstantBufferD3D12> m_sceneConstantBuffers;
+  std::vector<ConstantBufferD3D12> m_lightConstantBuffers;
+  std::vector<PointLight>          m_pointLights;
   gims::ExaminerController         m_examinerController;
   Scene                            m_scene;
   UiData                           m_uiData;
