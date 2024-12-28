@@ -134,11 +134,14 @@ void RayTracingRenderer::createPipeline()
 
 RayTracingRenderer::RayTracingRenderer(const DX12AppConfig createInfo)
     : DX12App(createInfo)
+    , m_examinerController(true)
 {
   if (isRayTracingSupported() == false)
   {
     throw std::runtime_error("Ray tracing not supported on this device");
   }
+
+  m_examinerController.setTranslationVector(f32v3(0, 0, 3));
 
   createRayTracingResources();
 
@@ -183,24 +186,19 @@ void RayTracingRenderer::createRayTracingResources()
 /// </summary>
 void RayTracingRenderer::createRootSignatures()
 {
-  // First we create global root signature (shared across all shaders)
-  {
-    // CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
-    // UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-    CD3DX12_ROOT_PARAMETER rootParameters[1];
-    // rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
-    rootParameters[0].InitAsShaderResourceView(0);
-    CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc;
-    globalRootSignatureDesc.Init(ARRAYSIZE(rootParameters), rootParameters, 0, nullptr,
-                                 D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-    ComPtr<ID3DBlob> rootBlob, errorBlob;
-    D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
+  CD3DX12_ROOT_PARAMETER rootParameters[2];
+  rootParameters[0].InitAsShaderResourceView(0);                            // acceleration structure
+  rootParameters[1].InitAsConstants(16, 0, 0, D3D12_SHADER_VISIBILITY_ALL); // root constants
+  CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc;
+  globalRootSignatureDesc.Init(ARRAYSIZE(rootParameters), rootParameters, 0, nullptr,
+                               D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+  ComPtr<ID3DBlob> rootBlob, errorBlob;
+  D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
 
-    getDevice()->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(),
-                                     IID_PPV_ARGS(&m_globalRootSignature));
+  getDevice()->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(),
+                                   IID_PPV_ARGS(&m_globalRootSignature));
 
-    std::cout << "Created global root signature" << std::endl;
-  }
+  std::cout << "Created global root signature" << std::endl;
 }
 
 D3D12_RAYTRACING_GEOMETRY_DESC RayTracingRenderer::createGeometryDescription()
@@ -370,6 +368,23 @@ void RayTracingRenderer::createGeometry()
 
 void RayTracingRenderer::onDraw()
 {
+  if (!ImGui::GetIO().WantCaptureMouse)
+  {
+    bool pressed  = ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
+    bool released = ImGui::IsMouseReleased(ImGuiMouseButton_Left) || ImGui::IsMouseReleased(ImGuiMouseButton_Right);
+    if (pressed || released)
+    {
+      bool left = ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+      m_examinerController.click(pressed, left == true ? 1 : 2,
+                                 ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl),
+                                 getNormalizedMouseCoordinates());
+    }
+    else
+    {
+      m_examinerController.move(getNormalizedMouseCoordinates());
+    }
+  }
+
   const auto commandList = getCommandList();
   const auto rtvHandle   = getRTVHandle();
   const auto dsvHandle   = getDSVHandle();
@@ -390,6 +405,13 @@ void RayTracingRenderer::onDraw()
 
   // bind tlas for inline ray tracing
   commandList->SetGraphicsRootShaderResourceView(0, m_topLevelAS->GetGPUVirtualAddress());
+
+  // bind root constants
+  f32m4 viewMatrix       = m_examinerController.getTransformationMatrix();
+  f32m4 projectionMatrix = glm::perspectiveFovLH_ZO(glm::radians(30.0f), static_cast<f32>(getWidth()),
+                                                    static_cast<f32>(getHeight()), 0.05f, 1000.0f);
+  f32m4 mvpMatrix        = projectionMatrix * viewMatrix;
+  commandList->SetGraphicsRoot32BitConstants(1, 16, &mvpMatrix, 0);
 
   commandList->DrawInstanced(m_numIndices, 1, 0, 0);
 }

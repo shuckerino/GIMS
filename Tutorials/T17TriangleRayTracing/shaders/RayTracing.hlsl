@@ -12,12 +12,17 @@ struct VertexShaderInput
     uint i : SV_VertexID;
 };
 
+cbuffer PerFrameConstants : register(b0)
+{
+    float4x4 mvp;
+};
+
 RaytracingAccelerationStructure TLAS : register(t0, space0); // Acceleration structure
 
 VertexShaderOutput VS_main(VertexShaderInput input)
 {
     VertexShaderOutput output;
-    output.position = float4(input.position, 1.0f);
+    output.position = mul(mvp, float4(input.position, 1.0f));
     output.color = float4(colors[input.i], 1.0f);
     return output;
 }

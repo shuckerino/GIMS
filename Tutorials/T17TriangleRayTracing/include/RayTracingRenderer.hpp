@@ -9,6 +9,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <gimslib/ui/ExaminerController.hpp>
 
 #define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
 
@@ -52,6 +53,9 @@ public:
 #pragma endregion
 
 private:
+  // Camera
+  gims::ExaminerController m_examinerController;
+
   // Acceleration structure
   ComPtr<ID3D12Resource> m_topLevelAS;
 
@@ -59,12 +63,12 @@ private:
   ComPtr<ID3D12RootSignature> m_globalRootSignature;
 
   // Geometry
-  typedef UINT16         Index;
-  ui32                   m_vertexBufferSize; //! Vertex buffer size in bytes.
-  ui32                   m_indexBufferSize;  //! Index buffer size in bytes.
-  ui32                   m_numIndices;  //! Num indices
-  ComPtr<ID3D12Resource> m_indexBuffer;
-  ComPtr<ID3D12Resource> m_vertexBuffer;
+  typedef UINT16           Index;
+  ui32                     m_vertexBufferSize; //! Vertex buffer size in bytes.
+  ui32                     m_indexBufferSize;  //! Index buffer size in bytes.
+  ui32                     m_numIndices;       //! Num indices
+  ComPtr<ID3D12Resource>   m_indexBuffer;
+  ComPtr<ID3D12Resource>   m_vertexBuffer;
   D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
   D3D12_INDEX_BUFFER_VIEW  m_indexBufferView;
 
@@ -72,7 +76,7 @@ private:
   bool isRayTracingSupported();
   void createRayTracingResources();
   void createRootSignatures();
- 
+
   // Geometry functions
   void createGeometry();
 
@@ -83,5 +87,4 @@ private:
   // Helper functions
   void AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppResource, D3D12_RESOURCE_STATES initialResourceState,
                          const wchar_t* resourceName);
- 
 };
