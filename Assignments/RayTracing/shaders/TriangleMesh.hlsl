@@ -23,9 +23,7 @@ struct PointLight
 cbuffer PerFrameConstants : register(b0)
 {
     float4x4 projectionMatrix;
-    float3 lightPosition;
     float shadowBias;
-    uint1 flags;
 }
 
 /// <summary>
@@ -49,7 +47,7 @@ cbuffer Material : register(b2)
 
 cbuffer LightBuffer : register(b3)
 {
-    PointLight light[2];
+    PointLight light[8];
     uint numLights;
 }
 

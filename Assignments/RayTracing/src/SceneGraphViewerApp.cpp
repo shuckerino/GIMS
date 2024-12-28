@@ -13,6 +13,8 @@
 #include <vector>
 using namespace gims;
 
+#define MAX_LIGHTS 8
+
 SceneGraphViewerApp::SceneGraphViewerApp(const DX12AppConfig config, const std::filesystem::path pathToScene)
     : DX12App(config)
     , m_examinerController(true)
@@ -156,7 +158,8 @@ void SceneGraphViewerApp::onDrawUI()
     frameCnt    = 0;
     elapsedTime = totalTime;
 
-    m_numRaysPerSecond = (getWidth() * getHeight() * fps) / static_cast<float>(1e6);
+    // one ray per pixel and per light
+    m_numRaysPerSecond = (getWidth() * getHeight() * fps * m_pointLights.size()) / static_cast<float>(1e6);
   }
 
   const auto imGuiFlags = m_examinerController.active() ? ImGuiWindowFlags_NoInputs : ImGuiWindowFlags_None;
@@ -173,7 +176,7 @@ void SceneGraphViewerApp::onDrawUI()
     for (i8 i = 0; i < m_pointLights.size(); ++i)
     {
       ImGui::PushID(static_cast<int>(i));
-      if (ImGui::Selectable(("Light " + std::to_string(i)).c_str(), selectedLight == i))
+      if (ImGui::Selectable(("Light " + std::to_string(i+1)).c_str(), selectedLight == i))
       {
         selectedLight = i;
       }
@@ -182,16 +185,23 @@ void SceneGraphViewerApp::onDrawUI()
     ImGui::TreePop();
   }
   // Add/Remove Lights
-  if (ImGui::Button("Add Light"))
+  if (ImGui::Button("Add Light (max. 8)"))
   {
-    PointLight newLight;
-    newLight.position[0] = 0.0f;
-    newLight.position[1] = 0.0f;
-    newLight.position[2] = 0.0f;
-    newLight.color       = f32v3(1.0f, 1.0f, 1.0f);
-    newLight.intensity   = 1.0f;
+    if (m_pointLights.size() >= MAX_LIGHTS)
+    {
+      //ImGui::OpenPopup("Max number of lights reached!");
+    }
+    else
+    {
+      PointLight newLight;
+      newLight.position[0] = 0.0f;
+      newLight.position[1] = 0.0f;
+      newLight.position[2] = 0.0f;
+      newLight.color       = f32v3(1.0f, 1.0f, 1.0f);
+      newLight.intensity   = 50.0f;
 
-    m_pointLights.push_back(newLight);
+      m_pointLights.push_back(newLight);
+    }
   }
   if (selectedLight >= 0 && selectedLight < m_pointLights.size())
   {
@@ -209,7 +219,6 @@ void SceneGraphViewerApp::onDrawUI()
     ImGui::DragFloat3("Position", light.position, 0.5f, -100.0f, 100.0f, "%.3f", ImGuiSliderFlags_None);
     ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 100.0f);
     ImGui::ColorEdit3("Color", &light.color[0]);
-
   }
 
   ImGui::End();
@@ -230,9 +239,9 @@ void SceneGraphViewerApp::drawScene(const ComPtr<ID3D12GraphicsCommandList>& cmd
   cmdLst->SetGraphicsRootSignature(m_graphicsRootSignature.Get());
 
   // set constant buffer
-  const auto sceneCb = sceneConstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
+  const auto sceneCb = m_sceneConstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
   cmdLst->SetGraphicsRootConstantBufferView(0, sceneCb);
-  const auto lightCb = lightConstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
+  const auto lightCb = m_lightConstantBuffers[getFrameIndex()].getResource()->GetGPUVirtualAddress();
   cmdLst->SetGraphicsRootConstantBufferView(5, lightCb);
 
   // ray tracing
@@ -251,12 +260,11 @@ struct SceneConstantBuffer
 {
   f32m4 projectionMatrix;
   f32   shadowBias;
-  ui8   flags;
 };
 
 struct PointLightConstantBuffer
 {
-  PointLight pointLights[2];
+  PointLight pointLights[MAX_LIGHTS];
   ui32       numPointLights;
 };
 
@@ -268,10 +276,10 @@ void SceneGraphViewerApp::createSceneConstantBuffer()
 {
   const SceneConstantBuffer cb         = {};
   const auto                frameCount = getDX12AppConfig().frameCount;
-  sceneConstantBuffers.resize(frameCount);
+  m_sceneConstantBuffers.resize(frameCount);
   for (ui32 i = 0; i < frameCount; i++)
   {
-    sceneConstantBuffers[i] = ConstantBufferD3D12(cb, getDevice());
+    m_sceneConstantBuffers[i] = ConstantBufferD3D12(cb, getDevice());
   }
 }
 
@@ -282,8 +290,7 @@ void SceneGraphViewerApp::updateSceneConstantBuffer()
   cb.shadowBias = m_uiData.m_shadowBias;
   cb.projectionMatrix =
       glm::perspectiveFovLH_ZO<f32>(glm::radians(45.0f), (f32)getWidth(), (f32)getHeight(), 0.01f, 1000.0f);
-  // std::cout << "Projection is " << glm::to_string(cb.projectionMatrix) << std::endl;
-  sceneConstantBuffers[getFrameIndex()].upload(&cb);
+  m_sceneConstantBuffers[getFrameIndex()].upload(&cb);
 }
 
 #pragma endregion
@@ -294,26 +301,26 @@ void SceneGraphViewerApp::createLightConstantBuffer()
 {
   const PointLightConstantBuffer cb         = {};
   const auto                     frameCount = getDX12AppConfig().frameCount;
-  lightConstantBuffers.resize(frameCount);
+  m_lightConstantBuffers.resize(frameCount);
   for (ui32 i = 0; i < frameCount; i++)
   {
-    lightConstantBuffers[i] = ConstantBufferD3D12(cb, getDevice());
+    m_lightConstantBuffers[i] = ConstantBufferD3D12(cb, getDevice());
   }
 
   PointLight p1;
-  p1.position[0] = 1.0f;
-  p1.position[1] = 0.5f;
-  p1.position[2] = 0.0f;
-  p1.color     = f32v3(1.0f, 0.5f, 0.5f);
-  p1.intensity = 50.0f;
+  p1.position[0] = -20.0f;
+  p1.position[1] = 55.5f;
+  p1.position[2] = -30.0f;
+  p1.color       = f32v3(1.0f, 0.5f, 0.5f);
+  p1.intensity   = 50.0f;
 
   PointLight p2;
-  p2.position[0] = -1.0f;
-  p2.position[1] = 0.5f;
-  p2.position[2] = 0.0f;
-  p2.color     = f32v3(0.0f, 0.5f, 1.0f);
-  p2.intensity = 50.0f;
- 
+  p2.position[0] = 22.0f;
+  p2.position[1] = 11.0f;
+  p2.position[2] = -21.0f;
+  p2.color       = f32v3(1.0f, 1.0f, 1.0f);
+  p2.intensity   = 50.0f;
+
   m_pointLights.push_back(p1);
   m_pointLights.push_back(p2);
 }
@@ -327,7 +334,7 @@ void SceneGraphViewerApp::updateLightConstantBuffer()
   {
     cb.pointLights[i] = m_pointLights.at(i);
   }
-  lightConstantBuffers[getFrameIndex()].upload(&cb);
+  m_lightConstantBuffers[getFrameIndex()].upload(&cb);
 }
 
 #pragma endregion
