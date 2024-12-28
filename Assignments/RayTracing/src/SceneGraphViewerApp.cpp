@@ -169,7 +169,7 @@ void SceneGraphViewerApp::onDrawUI()
   ImGui::ColorEdit3("Background Color", &m_uiData.m_backgroundColor[0]);
   ImGui::SliderFloat("Shadow bias", &m_uiData.m_shadowBias, 0.0f, 5.0f);
 
-  static i8 selectedLight = -1;
+  static i8 selectedLight = 0;
   // List existing lights
   if (ImGui::TreeNode("Point Lights"))
   {
@@ -201,6 +201,7 @@ void SceneGraphViewerApp::onDrawUI()
       newLight.intensity   = 50.0f;
 
       m_pointLights.push_back(newLight);
+      selectedLight = static_cast<i8>(m_pointLights.size() - 1);
     }
   }
   if (selectedLight >= 0 && selectedLight < m_pointLights.size())
@@ -208,7 +209,8 @@ void SceneGraphViewerApp::onDrawUI()
     if (ImGui::Button("Remove Selected Light"))
     {
       m_pointLights.erase(m_pointLights.begin() + selectedLight);
-      selectedLight = -1;
+      selectedLight = static_cast<i8>(m_pointLights.size() - 1);
+      
     }
   }
 
