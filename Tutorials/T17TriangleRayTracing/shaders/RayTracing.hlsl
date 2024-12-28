@@ -23,7 +23,7 @@ VertexShaderOutput VS_main(VertexShaderInput input)
 {
     VertexShaderOutput output;
     output.position = mul(mvp, float4(input.position, 1.0f));
-    output.color = float4(colors[input.i], 1.0f);
+    output.color = float4(colors[input.i % 2], 1.0f);
     return output;
 }
 

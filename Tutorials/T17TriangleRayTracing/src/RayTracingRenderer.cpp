@@ -118,6 +118,7 @@ void RayTracingRenderer::createPipeline()
   psoDesc.VS                                 = HLSLCompiler::convert(vertexShader);
   psoDesc.PS                                 = HLSLCompiler::convert(pixelShader);
   psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+  psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_NONE;
   psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
   psoDesc.DepthStencilState.DepthEnable      = FALSE;
   psoDesc.DepthStencilState.StencilEnable    = FALSE;
@@ -334,17 +335,50 @@ void RayTracingRenderer::createAccelerationStructures()
 
 void RayTracingRenderer::createGeometry()
 {
-  auto  device    = getDevice().Get();
-  Index indices[] = {0, 1, 2};
+  auto device = getDevice().Get();
 
-  float  depthValue  = 1.0;
-  float  offset      = 0.7f;
-  Vertex vertices[]  = {// The sample raytraces in screen space coordinates.
-                       // Since DirectX screen space coordinates are right handed (i.e. Y axis points down).
-                       // Define the vertices in counter clockwise order ~ clockwise in left handed.
-                       {0, -offset, depthValue},
-                       {-offset, offset, depthValue},
-                       {offset, offset, depthValue}};
+  float depthValue = 0.0f;
+  float offset     = 0.25f;
+  float planeSize  = 2.0f;
+
+  // Vertices for 3 triangles and a plane
+  Vertex vertices[] = {
+      // Triangle (stands on the plane)
+      {0.0f, offset, depthValue},  // Top vertex
+      {-offset, 0.0f, depthValue}, // Bottom-left vertex
+      {offset, 0.0f, depthValue},  // Bottom-right vertex
+
+      // Plane
+      {-planeSize, 0.0f, -planeSize}, // Bottom-left corner
+      {planeSize, 0.0f, -planeSize},  // Bottom-right corner
+      {-planeSize, 0.0f, planeSize},  // Top-left corner
+      {planeSize, 0.0f, planeSize},   // Top-right corner
+  };
+
+
+  // Indices for 3 triangles and a plane
+  Index indices[] = {
+      // First triangle
+      0,
+      1,
+      2,
+
+      //// Second triangle
+      // 3, 4, 5,
+
+      //// Third triangle
+      // 6, 7, 8
+
+      // Plane
+      3,
+      4,
+      5,
+      //4,
+      //6,
+      //5,
+
+  };
+
   m_vertexBufferSize = sizeof(vertices);
   m_indexBufferSize  = sizeof(indices);
   m_numIndices       = _countof(indices);
