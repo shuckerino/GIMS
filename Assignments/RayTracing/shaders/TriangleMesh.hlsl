@@ -82,18 +82,31 @@ VertexShaderOutput VS_main(float3 position : POSITION, float3 normal : NORMAL, f
     return output;
 }
 
+// Simple hash function to generate pseudo-random values
+float Rand(float2 uv)
+{
+    // Simple hash function using bitwise operations and trigonometry
+    uv = frac(uv * float2(12.9898, 78.233)); // Scale input for variety
+    float v = dot(uv, float2(127.1, 311.7)); // Dot product with arbitrary constants
+    return frac(sin(v) * 43758.5453); // Apply sine function and scale
+}
+
 float4 PS_main(VertexShaderOutput input)
     : SV_TARGET
 {
     float3 accumulatedLightContribution = float3(0.0, 0.0, 0.0); // Initialize output color
+    // Number of rays to sample for soft shadows
+    uint numShadowRays = 1; // More rays = softer shadow
+    float shadowFactor = 0.0f; // Initialize shadow factor
+    bool anyHit = false;
     
     for (uint i = 0; i < numLights; i++)
     {
+        float3 currentLightContribution = float3(0.0, 0.0, 0.0); // Initialize light contribution
         PointLight l = light[i];
         float3 testPos = l.position;
         float3 lightDir = normalize(testPos - input.worldSpacePosition.xyz);
         float distance = length(testPos - input.worldSpacePosition.xyz);
-        float lightIntensity = 50.0f;
         float attenuation = 1.0 / distance;
         float nDotL = max(0.0f, dot(normalize(input.viewSpaceNormal), lightDir));
         float4 diffuse = g_textureDiffuse.Sample(g_sampler, input.texCoord) * diffuseColor * nDotL;
@@ -104,27 +117,55 @@ float4 PS_main(VertexShaderOutput input)
         // apply light color
         diffuse *= float4(l.lightColor.xyz, 1.0f);
 
-        float3 currentLightContribution = diffuse.xyz;
-            
-        RayDesc ray;
-        ray.Origin = input.worldSpacePosition.xyz + shadowBias * normalize(input.viewSpaceNormal.xyz); // add shadow bias to avoid artifacts
-        ray.Direction = lightDir;
-        ray.TMin = 0.0001;
-        ray.TMax = distance;
+        // Soft Shadow Calculation: Trace multiple rays
+        float bias = 0.0001f;
+        float raysHit = 0;
 
-        RayQuery < RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES > q;
-        q.TraceRayInline(TLAS, 0, 0xFF, ray);
-
-        // Traverse TLAS
-        q.Proceed();
-        
-        if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+        // Trace multiple rays from the point towards the light source
+        for (uint j = 0; j < numShadowRays; j++)
         {
-            currentLightContribution *= 0.6f;
+            // Generate a random offset using pixel coordinates (or other unique inputs)
+            float2 uv = input.texCoord.xy + float2(j, i) * 0.1f; // Add unique offset based on ray index
+            float randomX = Rand(uv); // Random value for X
+            float randomY = Rand(uv + float2(1.0, 0.0)); // Random value for Y (offset by 1 for variation)
+            float3 randomOffset = float3(randomX * 2.0f - 1.0f, randomY * 2.0f - 1.0f, 0.0f); // Random jitter in X and Y
 
+            // Ray from the surface point to the light
+            RayDesc ray;
+            ray.Origin = input.worldSpacePosition.xyz + shadowBias * normalize(input.viewSpaceNormal.xyz); // Offset to avoid self-intersection
+            ray.Direction = normalize(lightDir); // Add jitter to the light direction
+            ray.TMin = bias;
+            ray.TMax = distance;
+
+            RayQuery < RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES > q;
+            q.TraceRayInline(TLAS, 0, 0xFF, ray);
+
+            // Check if the ray hits something (shadow hit)
+            if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+            {
+                raysHit += 1; // Count how many rays hit an object
+                anyHit = true;
+            }
         }
+        
+        // Calculate the shadow factor (percentage of rays that hit)
+        shadowFactor = raysHit / float(numShadowRays);
+
+        // Dim the light based on the shadow factor
+        diffuse.xyz *= (1.0f - shadowFactor); // The more rays that hit, the darker the shadow
+
+        // Accumulate light contribution
+        currentLightContribution += diffuse.xyz;
         accumulatedLightContribution += currentLightContribution;
     }
 
-    return float4(accumulatedLightContribution.xyz, 1.0f);
+    if (anyHit)
+        return float4(1.0f, 0.0f, 0.0f, 1.0f);
+    else
+        return float4(0.0f, 0.0f, 1.0f, 1.0f);
+    
+        
+        
+        
+        //return float4(accumulatedLightContribution.xyz, 1.0f);
 }
