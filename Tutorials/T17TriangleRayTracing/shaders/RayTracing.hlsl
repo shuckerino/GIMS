@@ -36,7 +36,7 @@ VertexShaderOutput VS_main(VertexShaderInput input, PerInstanceData instanceData
     bool drawPlane = flags & 0x1;
     if (drawPlane)
     {
-        output.color = float4(1.0f, 1.0f, 1.0f, 1.0f);
+        output.color = float4(0.9f, 0.9f, 0.9f, 1.0f);
     }
     else
     {
@@ -50,6 +50,7 @@ float4 PS_main(VertexShaderOutput input) : SV_TARGET
 {
     float3 lightDir = normalize(lightDirection);
     float3 outputColor = input.color.rgb;
+    float shadowFactor = 0.5f;
     
     RayDesc ray;
     ray.Origin = input.worldPosition;
@@ -63,8 +64,7 @@ float4 PS_main(VertexShaderOutput input) : SV_TARGET
     
     if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT) // hit
     {
-        //outputColor *= 0.6f;
-        outputColor = float3(0.5f, 0.5f, 0.5f);
+        outputColor *= shadowFactor;
     }
 
     return float4(outputColor.rgb, 1.0f);
