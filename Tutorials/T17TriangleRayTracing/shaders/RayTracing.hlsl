@@ -12,6 +12,11 @@ struct VertexShaderInput
     uint i : SV_VertexID;
 };
 
+struct PerInstanceData
+{
+    float4x4 worldTrafo : INSTANCE_DATA;
+};
+
 cbuffer PerFrameConstants : register(b0)
 {
     float4x4 mvp;
@@ -19,11 +24,16 @@ cbuffer PerFrameConstants : register(b0)
 
 RaytracingAccelerationStructure TLAS : register(t0, space0); // Acceleration structure
 
-VertexShaderOutput VS_main(VertexShaderInput input)
+VertexShaderOutput VS_main(VertexShaderInput input, PerInstanceData instanceData)
 {
     VertexShaderOutput output;
-    output.position = mul(mvp, float4(input.position, 1.0f));
+    float4 instancePos = mul(instanceData.worldTrafo, float4(input.position, 1.0f));
+    output.position = mul(mvp, instancePos);
     output.color = float4(colors[input.i % 2], 1.0f);
+    
+    //output.color = float4(input.i == 0 ? 1.0f : 0.0f, input.i == 1 ? 1.0f : 0.0f, input.i == 2 ? 1.0f : 0.0f, 1.0f);
+
+    
     return output;
 }
 

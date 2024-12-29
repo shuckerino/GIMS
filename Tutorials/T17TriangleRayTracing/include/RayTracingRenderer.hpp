@@ -27,6 +27,11 @@ public:
     float v1, v2, v3;
   };
 
+  struct InstanceData
+  {
+    f32m4 worldMatrix;
+  };
+
   /// <summary>
   /// Called whenever a new frame is drawn.
   /// </summary>
@@ -69,6 +74,8 @@ private:
   ui32                     m_numIndices;       //! Num indices
   ComPtr<ID3D12Resource>   m_indexBuffer;
   ComPtr<ID3D12Resource>   m_vertexBuffer;
+  ComPtr<ID3D12Resource>   m_instanceBuffer;
+  D3D12_VERTEX_BUFFER_VIEW m_instanceBufferView;
   D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
   D3D12_INDEX_BUFFER_VIEW  m_indexBufferView;
 

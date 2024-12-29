@@ -110,7 +110,13 @@ void RayTracingRenderer::createPipeline()
       compileShader(L"../../../Tutorials/T17TriangleRayTracing/Shaders/RayTracing.hlsl", L"PS_main", L"ps_6_8");
 
   D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
-      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}};
+      {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+      // Per-instance data
+      {"INSTANCE_DATA", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
+      {"INSTANCE_DATA", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
+      {"INSTANCE_DATA", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
+      {"INSTANCE_DATA", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
+  };
 
   D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
   psoDesc.InputLayout                        = {inputElementDescs, _countof(inputElementDescs)};
@@ -339,7 +345,8 @@ void RayTracingRenderer::createGeometry()
 
   float depthValue = 0.0f;
   float offset     = 0.25f;
-  float planeSize  = 2.0f;
+  //float planeSize  = 2.0f;
+  float triangleDistance = 0.7f;
 
   // Vertices for 3 triangles and a plane
   Vertex vertices[] = {
@@ -348,11 +355,11 @@ void RayTracingRenderer::createGeometry()
       {-offset, 0.0f, depthValue}, // Bottom-left vertex
       {offset, 0.0f, depthValue},  // Bottom-right vertex
 
-      // Plane
-      {-planeSize, 0.0f, -planeSize}, // Bottom-left corner
-      {planeSize, 0.0f, -planeSize},  // Bottom-right corner
-      {-planeSize, 0.0f, planeSize},  // Top-left corner
-      {planeSize, 0.0f, planeSize},   // Top-right corner
+  //    // Plane
+  //    {-planeSize, 0.0f, -planeSize}, // Bottom-left corner
+  //    {planeSize, 0.0f, -planeSize},  // Bottom-right corner
+  //    {-planeSize, 0.0f, planeSize},  // Top-left corner
+  //    {planeSize, 0.0f, planeSize},   // Top-right corner
   };
 
 
@@ -362,21 +369,23 @@ void RayTracingRenderer::createGeometry()
       0,
       1,
       2,
+  };
 
-      //// Second triangle
-      // 3, 4, 5,
+  InstanceData instanceData[] = {
+      {f32m4(1.0f, 0.0f, 0.0f, 0.0f,
+              0.0f, 1.0f, 0.0f, 0.0f,
+              0.0f, 0.0f, 1.0f, 0.0f,
+              0.0f, 0.0f, 0.0f, 1.0f)}, // Instance 1
 
-      //// Third triangle
-      // 6, 7, 8
+      {f32m4(1.0f, 0.0f, 0.0f, 0.0f,
+              0.0f, 1.0f, 0.0f, 0.0f,
+              0.0f, 0.0f, 1.0f, 0.0f,
+              -triangleDistance, 0.0f, 0.0f, 1.0f)}, // Instance 2
 
-      // Plane
-      3,
-      4,
-      5,
-      //4,
-      //6,
-      //5,
-
+      {f32m4(1.0f, 0.0f, 0.0f, 0.0f,
+              0.0f, 1.0f, 0.0f, 0.0f,
+              0.0f, 0.0f, 1.0f, 0.0f,
+              triangleDistance, 0.0f, 0.0f, 1.0f)}, // Instance 3
   };
 
   m_vertexBufferSize = sizeof(vertices);
@@ -385,6 +394,7 @@ void RayTracingRenderer::createGeometry()
 
   AllocateUploadBuffer(device, vertices, sizeof(vertices), &m_vertexBuffer);
   AllocateUploadBuffer(device, indices, sizeof(indices), &m_indexBuffer);
+  AllocateUploadBuffer(device, instanceData, sizeof(instanceData), &m_instanceBuffer);
 
   // create views
   m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
@@ -394,6 +404,11 @@ void RayTracingRenderer::createGeometry()
   m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
   m_indexBufferView.SizeInBytes    = static_cast<ui32>(m_indexBufferSize);
   m_indexBufferView.Format         = DXGI_FORMAT_R16_UINT;
+
+  m_instanceBufferView.BufferLocation = m_instanceBuffer->GetGPUVirtualAddress();
+  m_instanceBufferView.SizeInBytes    = sizeof(instanceData);
+  m_instanceBufferView.StrideInBytes  = sizeof(InstanceData);
+
 }
 
 #pragma endregion
@@ -435,6 +450,7 @@ void RayTracingRenderer::onDraw()
   commandList->SetGraphicsRootSignature(m_globalRootSignature.Get());
   commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+  commandList->IASetVertexBuffers(1, 1, &m_instanceBufferView);
   commandList->IASetIndexBuffer(&m_indexBufferView);
 
   // bind tlas for inline ray tracing
@@ -447,7 +463,7 @@ void RayTracingRenderer::onDraw()
   f32m4 mvpMatrix        = projectionMatrix * viewMatrix;
   commandList->SetGraphicsRoot32BitConstants(1, 16, &mvpMatrix, 0);
 
-  commandList->DrawInstanced(m_numIndices, 1, 0, 0);
+  commandList->DrawInstanced(3, 3, 0, 0);
 }
 
 void RayTracingRenderer::onDrawUI()
