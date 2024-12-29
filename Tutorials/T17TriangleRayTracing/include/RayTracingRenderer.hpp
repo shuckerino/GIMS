@@ -61,6 +61,7 @@ private:
 
   // Acceleration structure
   ComPtr<ID3D12Resource> m_topLevelAS;
+  std::vector<ComPtr<ID3D12Resource>> m_bottomLevelAS;
 
   // Root signatures
   ComPtr<ID3D12RootSignature> m_globalRootSignature;
@@ -70,6 +71,7 @@ private:
   ui32                     m_vertexBufferSize; //! Vertex buffer size in bytes.
   ui32                     m_indexBufferSize;  //! Index buffer size in bytes.
   ui32                     m_numTriangleIndices;       //! Num indices for triangle
+  InstanceData m_triangleInstanceData[3]; //! Instance data for triangle
   ComPtr<ID3D12Resource>   m_triangleIndexBuffer;
   ComPtr<ID3D12Resource>   m_triangleVertexBuffer;
   ComPtr<ID3D12Resource>   m_instanceBuffer;

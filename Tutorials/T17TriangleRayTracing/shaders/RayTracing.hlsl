@@ -21,6 +21,7 @@ struct PerInstanceData
 cbuffer PerFrameConstants : register(b0)
 {
     float4x4 mvp;
+    float3 lightDirection;
     uint flags;
 };
 
@@ -46,18 +47,13 @@ VertexShaderOutput VS_main(VertexShaderInput input, PerInstanceData instanceData
 
 float4 PS_main(VertexShaderOutput input) : SV_TARGET
 {
-    float3 lightPosition = float3(0, 0, -2);
-    float3 lightColor = float3(1, 1, 1);
-    
-    // Compute light direction and distance
-    float3 lightDir = normalize(lightPosition - input.position.xyz);
-    float lightDistance = length(lightPosition - input.position.xyz);
+    float3 lightDir = normalize(lightDirection);
     
     RayDesc ray;
     ray.Origin = input.position.xyz;
     ray.Direction = lightDir;
     ray.TMin = 0.001;
-    ray.TMax = lightDistance;
+    ray.TMax = 1e6;
     
     RayQuery < RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES > q;
     q.TraceRayInline(TLAS, 0, 0xFF, ray);
@@ -68,12 +64,12 @@ float4 PS_main(VertexShaderOutput input) : SV_TARGET
     {
         // Add diffuse lighting
         float diffuse = max(dot(lightDir, float3(0, 0, 1)), 0.0);
-        color += diffuse * lightColor;
+        //color += diffuse * lightColor;
     }
-    //else // miss
-    //{
-    //    return float4(0, 0, 1, 1.0f);
-    //}
+    else // miss
+    {
+        return float4(0, 0, 1, 1.0f);
+    }
     
     return input.color;
  
