@@ -110,14 +110,16 @@ void RayTracingRenderer::createPipeline()
   psoDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
   psoDesc.RasterizerState.CullMode           = D3D12_CULL_MODE_NONE;
   psoDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-  psoDesc.DepthStencilState.DepthEnable      = FALSE;
+  psoDesc.DepthStencilState.DepthEnable      = TRUE;
+  psoDesc.DepthStencilState.DepthWriteMask   = D3D12_DEPTH_WRITE_MASK_ZERO; // Prevent depth updates
+  psoDesc.DepthStencilState.DepthFunc        = D3D12_COMPARISON_FUNC_LESS_EQUAL;
   psoDesc.DepthStencilState.StencilEnable    = FALSE;
   psoDesc.SampleMask                         = UINT_MAX;
   psoDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
   psoDesc.NumRenderTargets                   = 1;
   psoDesc.SampleDesc.Count                   = 1;
-  psoDesc.RTVFormats[0]                      = getRenderTarget()->GetDesc().Format;
-  psoDesc.DSVFormat                          = getDepthStencil()->GetDesc().Format;
+  psoDesc.RTVFormats[0]                      = getDX12AppConfig().renderTargetFormat;
+  psoDesc.DSVFormat                          = getDX12AppConfig().depthBufferFormat;
   throwIfFailed(getDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 }
 
@@ -132,11 +134,11 @@ RayTracingRenderer::RayTracingRenderer(const DX12AppConfig createInfo)
     throw std::runtime_error("Ray tracing not supported on this device");
   }
 
-  m_examinerController.setTranslationVector(f32v3(0, 0, 3));
+  m_examinerController.setTranslationVector(f32v3(0, -0.4, 4));
 
   createRayTracingResources();
 
-  m_uiData.m_lightDirection = f32v3(0.577f, 0.577f, 0.577f);
+  m_uiData.m_lightDirection = f32v3(0.462f, 0.3f, 0.9f);
 
   // createRootSignature();
   createPipeline();
@@ -360,7 +362,7 @@ void RayTracingRenderer::createGeometry()
   };
   InstanceData data1;
   data1.worldMatrix = f32m4(1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-                           1.0f); // Instance 1
+                            1.0f); // Instance 1
   m_triangleInstanceData[0] = data1;
 
   InstanceData data2;
@@ -479,28 +481,28 @@ void RayTracingRenderer::onDraw()
 
   commandList->SetGraphicsRoot32BitConstants(1, 3, &m_uiData.m_lightDirection, 16); // set light direction
 
-  // draw triangle(s)
-  ui32 drawPlane = 0;
-  commandList->SetGraphicsRoot32BitConstants(1, 1, &drawPlane, 19);
-  commandList->IASetVertexBuffers(0, 1, &m_triangleVertexBufferView);
-  commandList->IASetVertexBuffers(1, 1, &m_instanceBufferView);
-  commandList->IASetIndexBuffer(&m_triangleIndexBufferView);
-  commandList->DrawIndexedInstanced(3, 3, 0, 0, 0);
-
   // draw plane
-  drawPlane = 1;
+  ui8 drawPlane = 1;
   commandList->SetGraphicsRoot32BitConstants(1, 1, &drawPlane, 19);
   commandList->IASetVertexBuffers(0, 1, &m_planeVertexBufferView);
+  commandList->IASetVertexBuffers(1, 1, &m_instanceBufferView); // not needed for plane, but still needs to be bound for its draw call, else it does not render
   commandList->IASetIndexBuffer(&m_planeIndexBufferView);
   commandList->DrawIndexedInstanced(m_numPlaneIndices, 1, 0, 0, 0);
+
+  // draw triangle(s)
+  drawPlane = 0;
+  commandList->SetGraphicsRoot32BitConstants(1, 1, &drawPlane, 19);
+  commandList->IASetVertexBuffers(0, 1, &m_triangleVertexBufferView);
+  commandList->IASetIndexBuffer(&m_triangleIndexBufferView);
+  commandList->DrawIndexedInstanced(3, 3, 0, 0, 0);
 }
 
 void RayTracingRenderer::onDrawUI()
 {
-   ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_None);
-   ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
-   ImGui::SliderFloat3("Light Direction", &m_uiData.m_lightDirection.x, -1.0f, 1.0f);
-   ImGui::End();
+  ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_None);
+  ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
+  ImGui::SliderFloat3("Light Direction", &m_uiData.m_lightDirection.x, -1.0f, 1.0f);
+  ImGui::End();
 }
 
 void RayTracingRenderer::onResize()
