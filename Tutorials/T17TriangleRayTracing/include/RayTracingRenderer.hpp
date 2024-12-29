@@ -11,17 +11,11 @@
 #include <unordered_map>
 #include <vector>
 
-#define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
-
 class RayTracingRenderer : public DX12App
 {
 public:
   RayTracingRenderer(const DX12AppConfig createInfo);
 
-  // struct Vertex
-  //{
-  //   f32v3 position;
-  // };
   struct Vertex
   {
     float v1, v2, v3;
@@ -70,12 +64,12 @@ private:
 
   // Root signatures
   ComPtr<ID3D12RootSignature> m_globalRootSignature;
-  
+
   // Ui data
   UiData m_uiData;
 
   // Geometry
-  typedef UINT16           Index;
+  typedef ui32             Index;
   ui32                     m_vertexBufferSize;        //! Vertex buffer size in bytes.
   ui32                     m_indexBufferSize;         //! Index buffer size in bytes.
   ui32                     m_numTriangleIndices;      //! Num indices for triangle
@@ -97,14 +91,13 @@ private:
   // Init functions
   bool isRayTracingSupported();
   void createRayTracingResources();
-  void createRootSignatures();
+  void createRootSignature();
 
   // Geometry functions
   void createGeometry();
 
   // Acceleration structure functions
   void                           createAccelerationStructures();
-  D3D12_RAYTRACING_GEOMETRY_DESC createGeometryDescription();
 
   // Helper functions
   void AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppResource, D3D12_RESOURCE_STATES initialResourceState,

@@ -2,39 +2,6 @@
 #include <imgui.h>
 
 using namespace gims;
-#if 1
-namespace
-{
-// Assign a name to the object to aid with debugging.
-#if defined(_DEBUG) || defined(DBG)
-inline void SetName(ID3D12Object* pObject, LPCWSTR name)
-{
-  pObject->SetName(name);
-}
-inline void SetNameIndexed(ID3D12Object* pObject, LPCWSTR name, UINT index)
-{
-  WCHAR fullName[50];
-  if (swprintf_s(fullName, L"%s[%u]", name, index) > 0)
-  {
-    pObject->SetName(fullName);
-  }
-}
-#else
-inline void SetName(ID3D12Object*, LPCWSTR)
-{
-}
-inline void SetNameIndexed(ID3D12Object*, LPCWSTR, UINT)
-{
-}
-#endif
-
-// Naming helper for ComPtr<T>.
-// Assigns the name of the variable as the name of the object.
-// The indexed variant will include the index in the name of the object.
-#define NAME_D3D12_OBJECT(x)            SetName((x).Get(), L#x)
-#define NAME_D3D12_OBJECT_INDEXED(x, n) SetNameIndexed((x)[n].Get(), L#x, n)
-
-} // namespace
 
 #pragma region Helper functions
 
@@ -171,7 +138,7 @@ bool RayTracingRenderer::isRayTracingSupported()
 /// </summary>
 void RayTracingRenderer::createRayTracingResources()
 {
-  createRootSignatures();
+  createRootSignature();
   createGeometry();
   createAccelerationStructures();
 }
@@ -179,11 +146,12 @@ void RayTracingRenderer::createRayTracingResources()
 /// <summary>
 /// Method for creating global and local root signatures
 /// </summary>
-void RayTracingRenderer::createRootSignatures()
+void RayTracingRenderer::createRootSignature()
 {
   CD3DX12_ROOT_PARAMETER rootParameters[2];
-  rootParameters[0].InitAsShaderResourceView(0);                            // acceleration structure
-  rootParameters[1].InitAsConstants(20, 0, 0, D3D12_SHADER_VISIBILITY_ALL); // root constants
+  rootParameters[0].InitAsShaderResourceView(0);                            // TLAS
+  rootParameters[1].InitAsConstants(20, 0, 0, D3D12_SHADER_VISIBILITY_ALL); // root constants (mvp, light direction, flags)
+
   CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc;
   globalRootSignatureDesc.Init(ARRAYSIZE(rootParameters), rootParameters, 0, nullptr,
                                D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -194,23 +162,6 @@ void RayTracingRenderer::createRootSignatures()
                                    IID_PPV_ARGS(&m_globalRootSignature));
 
   std::cout << "Created global root signature" << std::endl;
-}
-
-D3D12_RAYTRACING_GEOMETRY_DESC RayTracingRenderer::createGeometryDescription()
-{
-  D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
-  geometryDesc.Type                           = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-  geometryDesc.Triangles.IndexBuffer          = m_triangleIndexBuffer->GetGPUVirtualAddress();
-  geometryDesc.Triangles.IndexCount   = static_cast<UINT>(m_triangleIndexBuffer->GetDesc().Width) / sizeof(ui32);
-  geometryDesc.Triangles.IndexFormat  = DXGI_FORMAT_R16_UINT;
-  geometryDesc.Triangles.Transform3x4 = 0;
-  geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-  geometryDesc.Triangles.VertexCount  = static_cast<UINT>(m_triangleVertexBuffer->GetDesc().Width) / sizeof(Vertex);
-  geometryDesc.Triangles.VertexBuffer.StartAddress  = m_triangleVertexBuffer->GetGPUVirtualAddress();
-  geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
-  geometryDesc.Flags                                = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-
-  return geometryDesc;
 }
 
 void RayTracingRenderer::createAccelerationStructures()
@@ -228,7 +179,7 @@ void RayTracingRenderer::createAccelerationStructures()
     geometryDesc.Type                           = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
     geometryDesc.Triangles.IndexBuffer          = m_triangleIndexBuffer->GetGPUVirtualAddress();
     geometryDesc.Triangles.IndexCount   = static_cast<UINT>(m_triangleIndexBuffer->GetDesc().Width) / sizeof(Index);
-    geometryDesc.Triangles.IndexFormat  = DXGI_FORMAT_R16_UINT;
+    geometryDesc.Triangles.IndexFormat  = DXGI_FORMAT_R32_UINT;
     geometryDesc.Triangles.Transform3x4 = 0;
     geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
     geometryDesc.Triangles.VertexCount  = static_cast<UINT>(m_triangleVertexBuffer->GetDesc().Width) / sizeof(Vertex);
@@ -394,7 +345,7 @@ void RayTracingRenderer::createGeometry()
 
   m_triangleIndexBufferView.BufferLocation = m_triangleIndexBuffer->GetGPUVirtualAddress();
   m_triangleIndexBufferView.SizeInBytes    = static_cast<ui32>(m_indexBufferSize);
-  m_triangleIndexBufferView.Format         = DXGI_FORMAT_R16_UINT;
+  m_triangleIndexBufferView.Format         = DXGI_FORMAT_R32_UINT;
 
   m_instanceBufferView.BufferLocation = m_instanceBuffer->GetGPUVirtualAddress();
   m_instanceBufferView.SizeInBytes    = sizeof(m_triangleInstanceData);
@@ -427,7 +378,7 @@ void RayTracingRenderer::createGeometry()
 
   m_planeIndexBufferView.BufferLocation = m_planeIndexBuffer->GetGPUVirtualAddress();
   m_planeIndexBufferView.SizeInBytes    = static_cast<ui32>(m_indexBufferSize);
-  m_planeIndexBufferView.Format         = DXGI_FORMAT_R16_UINT;
+  m_planeIndexBufferView.Format         = DXGI_FORMAT_R32_UINT;
 }
 
 #pragma endregion
@@ -485,7 +436,8 @@ void RayTracingRenderer::onDraw()
   ui8 drawPlane = 1;
   commandList->SetGraphicsRoot32BitConstants(1, 1, &drawPlane, 19);
   commandList->IASetVertexBuffers(0, 1, &m_planeVertexBufferView);
-  commandList->IASetVertexBuffers(1, 1, &m_instanceBufferView); // not needed for plane, but still needs to be bound for its draw call, else it does not render
+  commandList->IASetVertexBuffers(1, 1, &m_instanceBufferView); // not needed for plane, but still needs to be bound for
+                                                                // its draw call, else it does not render
   commandList->IASetIndexBuffer(&m_planeIndexBufferView);
   commandList->DrawIndexedInstanced(m_numPlaneIndices, 1, 0, 0, 0);
 
@@ -510,7 +462,6 @@ void RayTracingRenderer::onResize()
 }
 
 #pragma endregion
-#endif
 int main(int /* argc*/, char /* **argv */)
 {
   gims::DX12AppConfig config;
