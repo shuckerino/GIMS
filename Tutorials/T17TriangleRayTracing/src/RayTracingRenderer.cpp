@@ -136,6 +136,8 @@ RayTracingRenderer::RayTracingRenderer(const DX12AppConfig createInfo)
 
   createRayTracingResources();
 
+  m_uiData.m_lightDirection = f32v3(0.577f, 0.577f, 0.577f);
+
   // createRootSignature();
   createPipeline();
 
@@ -475,8 +477,7 @@ void RayTracingRenderer::onDraw()
   f32m4 mvpMatrix        = projectionMatrix * viewMatrix;
   commandList->SetGraphicsRoot32BitConstants(1, 16, &mvpMatrix, 0);
 
-  f32v3 lightDirection = f32v3(0.577f, 0.577f, 0.577f);
-  commandList->SetGraphicsRoot32BitConstants(1, 3, &lightDirection, 16); // set light direction
+  commandList->SetGraphicsRoot32BitConstants(1, 3, &m_uiData.m_lightDirection, 16); // set light direction
 
   // draw triangle(s)
   ui32 drawPlane = 0;
@@ -496,10 +497,10 @@ void RayTracingRenderer::onDraw()
 
 void RayTracingRenderer::onDrawUI()
 {
-  // Implement two render pass?
-  // ImGui::Begin("Information", nullptr, ImGuiWindowFlags_None);
-  // ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
-  // ImGui::End();
+   ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_None);
+   ImGui::Text("Frametime: %f", 1.0f / ImGui::GetIO().Framerate * 1000.0f);
+   ImGui::SliderFloat3("Light Direction", &m_uiData.m_lightDirection.x, -1.0f, 1.0f);
+   ImGui::End();
 }
 
 void RayTracingRenderer::onResize()
