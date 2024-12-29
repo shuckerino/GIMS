@@ -1,4 +1,4 @@
-static const float3 colors[] = { { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f } };
+static const float3 colors[] = { { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }};
 
 struct VertexShaderOutput
 {
@@ -10,6 +10,7 @@ struct VertexShaderInput
 {
     float3 position : POSITION;
     uint i : SV_VertexID;
+    uint instanceID : SV_InstanceID;
 };
 
 struct PerInstanceData
@@ -20,6 +21,7 @@ struct PerInstanceData
 cbuffer PerFrameConstants : register(b0)
 {
     float4x4 mvp;
+    uint flags;
 };
 
 RaytracingAccelerationStructure TLAS : register(t0, space0); // Acceleration structure
@@ -29,11 +31,16 @@ VertexShaderOutput VS_main(VertexShaderInput input, PerInstanceData instanceData
     VertexShaderOutput output;
     float4 instancePos = mul(instanceData.worldTrafo, float4(input.position, 1.0f));
     output.position = mul(mvp, instancePos);
-    output.color = float4(colors[input.i % 2], 1.0f);
-    
-    //output.color = float4(input.i == 0 ? 1.0f : 0.0f, input.i == 1 ? 1.0f : 0.0f, input.i == 2 ? 1.0f : 0.0f, 1.0f);
+    bool drawPlane = flags & 0x1;
+    if (drawPlane)
+    {
+        output.color = float4(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+    else
+    {
+        output.color = float4(colors[input.instanceID], 1.0f);
+    }
 
-    
     return output;
 }
 

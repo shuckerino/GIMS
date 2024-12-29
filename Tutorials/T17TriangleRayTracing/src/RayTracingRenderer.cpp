@@ -85,22 +85,6 @@ void RayTracingRenderer::AllocateUAVBuffer(ui64 bufferSize, ID3D12Resource** ppR
 
 #pragma region Rasterizing
 
-void RayTracingRenderer::createRootSignature()
-{
-  CD3DX12_ROOT_SIGNATURE_DESC descRootSignature;
-  CD3DX12_ROOT_PARAMETER      rootParameter[1] = {};
-  rootParameter[0].InitAsShaderResourceView(0); // TLAS
-
-  descRootSignature.Init(_countof(rootParameter), rootParameter, 0, nullptr,
-                         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-  ComPtr<ID3DBlob> rootBlob, errorBlob;
-  D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errorBlob);
-
-  getDevice()->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(),
-                                   IID_PPV_ARGS(&m_rootSignature));
-}
-
 void RayTracingRenderer::createPipeline()
 {
   const auto vertexShader =
@@ -195,7 +179,7 @@ void RayTracingRenderer::createRootSignatures()
 {
   CD3DX12_ROOT_PARAMETER rootParameters[2];
   rootParameters[0].InitAsShaderResourceView(0);                            // acceleration structure
-  rootParameters[1].InitAsConstants(16, 0, 0, D3D12_SHADER_VISIBILITY_ALL); // root constants
+  rootParameters[1].InitAsConstants(17, 0, 0, D3D12_SHADER_VISIBILITY_ALL); // root constants
   CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc;
   globalRootSignatureDesc.Init(ARRAYSIZE(rootParameters), rootParameters, 0, nullptr,
                                D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -212,13 +196,13 @@ D3D12_RAYTRACING_GEOMETRY_DESC RayTracingRenderer::createGeometryDescription()
 {
   D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
   geometryDesc.Type                           = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-  geometryDesc.Triangles.IndexBuffer          = m_indexBuffer->GetGPUVirtualAddress();
-  geometryDesc.Triangles.IndexCount           = static_cast<UINT>(m_indexBuffer->GetDesc().Width) / sizeof(ui32);
+  geometryDesc.Triangles.IndexBuffer          = m_triangleIndexBuffer->GetGPUVirtualAddress();
+  geometryDesc.Triangles.IndexCount           = static_cast<UINT>(m_triangleIndexBuffer->GetDesc().Width) / sizeof(ui32);
   geometryDesc.Triangles.IndexFormat          = DXGI_FORMAT_R16_UINT;
   geometryDesc.Triangles.Transform3x4         = 0;
   geometryDesc.Triangles.VertexFormat         = DXGI_FORMAT_R32G32B32_FLOAT;
-  geometryDesc.Triangles.VertexCount          = static_cast<UINT>(m_vertexBuffer->GetDesc().Width) / sizeof(Vertex);
-  geometryDesc.Triangles.VertexBuffer.StartAddress  = m_vertexBuffer->GetGPUVirtualAddress();
+  geometryDesc.Triangles.VertexCount          = static_cast<UINT>(m_triangleVertexBuffer->GetDesc().Width) / sizeof(Vertex);
+  geometryDesc.Triangles.VertexBuffer.StartAddress  = m_triangleVertexBuffer->GetGPUVirtualAddress();
   geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
 
   // Mark the geometry as opaque.
@@ -237,13 +221,13 @@ void RayTracingRenderer::createAccelerationStructures()
 
   D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
   geometryDesc.Type                           = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-  geometryDesc.Triangles.IndexBuffer          = m_indexBuffer->GetGPUVirtualAddress();
-  geometryDesc.Triangles.IndexCount           = static_cast<UINT>(m_indexBuffer->GetDesc().Width) / sizeof(Index);
+  geometryDesc.Triangles.IndexBuffer          = m_triangleIndexBuffer->GetGPUVirtualAddress();
+  geometryDesc.Triangles.IndexCount           = static_cast<UINT>(m_triangleIndexBuffer->GetDesc().Width) / sizeof(Index);
   geometryDesc.Triangles.IndexFormat          = DXGI_FORMAT_R16_UINT;
   geometryDesc.Triangles.Transform3x4         = 0;
   geometryDesc.Triangles.VertexFormat         = DXGI_FORMAT_R32G32B32_FLOAT;
-  geometryDesc.Triangles.VertexCount          = static_cast<UINT>(m_vertexBuffer->GetDesc().Width) / sizeof(Vertex);
-  geometryDesc.Triangles.VertexBuffer.StartAddress  = m_vertexBuffer->GetGPUVirtualAddress();
+  geometryDesc.Triangles.VertexCount          = static_cast<UINT>(m_triangleVertexBuffer->GetDesc().Width) / sizeof(Vertex);
+  geometryDesc.Triangles.VertexBuffer.StartAddress  = m_triangleVertexBuffer->GetGPUVirtualAddress();
   geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
   geometryDesc.Flags                                = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
@@ -345,33 +329,26 @@ void RayTracingRenderer::createGeometry()
 
   float depthValue = 0.0f;
   float offset     = 0.25f;
-  //float planeSize  = 2.0f;
   float triangleDistance = 0.7f;
 
   // Vertices for 3 triangles and a plane
-  Vertex vertices[] = {
+  Vertex triangleVertices[] = {
       // Triangle (stands on the plane)
       {0.0f, offset, depthValue},  // Top vertex
       {-offset, 0.0f, depthValue}, // Bottom-left vertex
       {offset, 0.0f, depthValue},  // Bottom-right vertex
-
-  //    // Plane
-  //    {-planeSize, 0.0f, -planeSize}, // Bottom-left corner
-  //    {planeSize, 0.0f, -planeSize},  // Bottom-right corner
-  //    {-planeSize, 0.0f, planeSize},  // Top-left corner
-  //    {planeSize, 0.0f, planeSize},   // Top-right corner
   };
 
 
   // Indices for 3 triangles and a plane
-  Index indices[] = {
+  Index triangleIndices[] = {
       // First triangle
       0,
       1,
       2,
   };
 
-  InstanceData instanceData[] = {
+  InstanceData triangleInstanceData[] = {
       {f32m4(1.0f, 0.0f, 0.0f, 0.0f,
               0.0f, 1.0f, 0.0f, 0.0f,
               0.0f, 0.0f, 1.0f, 0.0f,
@@ -388,26 +365,55 @@ void RayTracingRenderer::createGeometry()
               triangleDistance, 0.0f, 0.0f, 1.0f)}, // Instance 3
   };
 
-  m_vertexBufferSize = sizeof(vertices);
-  m_indexBufferSize  = sizeof(indices);
-  m_numIndices       = _countof(indices);
+  m_vertexBufferSize = sizeof(triangleVertices);
+  m_indexBufferSize  = sizeof(triangleIndices);
+  m_numTriangleIndices       = _countof(triangleIndices);
 
-  AllocateUploadBuffer(device, vertices, sizeof(vertices), &m_vertexBuffer);
-  AllocateUploadBuffer(device, indices, sizeof(indices), &m_indexBuffer);
-  AllocateUploadBuffer(device, instanceData, sizeof(instanceData), &m_instanceBuffer);
+  AllocateUploadBuffer(device, triangleVertices, sizeof(triangleVertices), &m_triangleVertexBuffer);
+  AllocateUploadBuffer(device, triangleIndices, sizeof(triangleIndices), &m_triangleIndexBuffer);
+  AllocateUploadBuffer(device, triangleInstanceData, sizeof(triangleInstanceData), &m_instanceBuffer);
 
   // create views
-  m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-  m_vertexBufferView.SizeInBytes    = static_cast<ui32>(m_vertexBufferSize);
-  m_vertexBufferView.StrideInBytes  = sizeof(Vertex);
+  m_triangleVertexBufferView.BufferLocation = m_triangleVertexBuffer->GetGPUVirtualAddress();
+  m_triangleVertexBufferView.SizeInBytes    = static_cast<ui32>(m_vertexBufferSize);
+  m_triangleVertexBufferView.StrideInBytes  = sizeof(Vertex);
 
-  m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-  m_indexBufferView.SizeInBytes    = static_cast<ui32>(m_indexBufferSize);
-  m_indexBufferView.Format         = DXGI_FORMAT_R16_UINT;
+  m_triangleIndexBufferView.BufferLocation = m_triangleIndexBuffer->GetGPUVirtualAddress();
+  m_triangleIndexBufferView.SizeInBytes    = static_cast<ui32>(m_indexBufferSize);
+  m_triangleIndexBufferView.Format         = DXGI_FORMAT_R16_UINT;
 
   m_instanceBufferView.BufferLocation = m_instanceBuffer->GetGPUVirtualAddress();
-  m_instanceBufferView.SizeInBytes    = sizeof(instanceData);
+  m_instanceBufferView.SizeInBytes    = sizeof(triangleInstanceData);
   m_instanceBufferView.StrideInBytes  = sizeof(InstanceData);
+
+  float  planeSize       = 3.0f;
+  float  triangleHoverDistance = 0.1f;
+  Vertex planeVertices[] = {
+      {-planeSize, -triangleHoverDistance, -planeSize}, // Bottom-left corner
+      {planeSize, -triangleHoverDistance, -planeSize},  // Bottom-right corner
+      {-planeSize, -triangleHoverDistance, planeSize},  // Top-left corner
+      {planeSize, -triangleHoverDistance, planeSize},   // Top-right corner
+  };
+
+  Index planeIndices[] = {
+      0, 1, 2, 2, 1, 3,
+  };
+
+  m_vertexBufferSize   = sizeof(planeVertices);
+  m_indexBufferSize    = sizeof(planeIndices);
+  m_numPlaneIndices = _countof(planeIndices);
+
+  AllocateUploadBuffer(device, planeVertices, sizeof(planeVertices), &m_planeVertexBuffer);
+  AllocateUploadBuffer(device, planeIndices, sizeof(planeIndices), &m_planeIndexBuffer);
+
+  // create views
+  m_planeVertexBufferView.BufferLocation = m_planeVertexBuffer->GetGPUVirtualAddress();
+  m_planeVertexBufferView.SizeInBytes      = static_cast<ui32>(m_vertexBufferSize);
+  m_planeVertexBufferView.StrideInBytes  = sizeof(Vertex);
+
+  m_planeIndexBufferView.BufferLocation = m_planeIndexBuffer->GetGPUVirtualAddress();
+  m_planeIndexBufferView.SizeInBytes    = static_cast<ui32>(m_indexBufferSize);
+  m_planeIndexBufferView.Format         = DXGI_FORMAT_R16_UINT;
 
 }
 
@@ -449,9 +455,7 @@ void RayTracingRenderer::onDraw()
   commandList->SetPipelineState(m_pipelineState.Get());
   commandList->SetGraphicsRootSignature(m_globalRootSignature.Get());
   commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-  commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-  commandList->IASetVertexBuffers(1, 1, &m_instanceBufferView);
-  commandList->IASetIndexBuffer(&m_indexBufferView);
+  
 
   // bind tlas for inline ray tracing
   commandList->SetGraphicsRootShaderResourceView(0, m_topLevelAS->GetGPUVirtualAddress());
@@ -461,9 +465,22 @@ void RayTracingRenderer::onDraw()
   f32m4 projectionMatrix = glm::perspectiveFovLH_ZO(glm::radians(30.0f), static_cast<f32>(getWidth()),
                                                     static_cast<f32>(getHeight()), 0.05f, 1000.0f);
   f32m4 mvpMatrix        = projectionMatrix * viewMatrix;
-  commandList->SetGraphicsRoot32BitConstants(1, 16, &mvpMatrix, 0);
 
+  // draw triangle(s)
+  ui32 drawPlane = 0;
+  commandList->SetGraphicsRoot32BitConstants(1, 16, &mvpMatrix, 0);
+  commandList->SetGraphicsRoot32BitConstants(1, 1, &drawPlane, 16);
+  commandList->IASetVertexBuffers(0, 1, &m_triangleVertexBufferView);
+  commandList->IASetVertexBuffers(1, 1, &m_instanceBufferView);
+  commandList->IASetIndexBuffer(&m_triangleIndexBufferView);
   commandList->DrawInstanced(3, 3, 0, 0);
+
+  // draw plane
+  drawPlane = 1;
+  commandList->SetGraphicsRoot32BitConstants(1, 1, &drawPlane, 16);
+  commandList->IASetVertexBuffers(0, 1, &m_planeVertexBufferView);
+  commandList->IASetIndexBuffer(&m_planeIndexBufferView);
+  commandList->DrawIndexedInstanced(m_numPlaneIndices, 1, 0, 0, 0);
 }
 
 void RayTracingRenderer::onDrawUI()

@@ -50,9 +50,7 @@ public:
 #pragma region Rasterizing
 
   ComPtr<ID3D12PipelineState> m_pipelineState;
-  ComPtr<ID3D12RootSignature> m_rootSignature;
 
-  void createRootSignature();
   void createPipeline();
 
 #pragma endregion
@@ -71,13 +69,20 @@ private:
   typedef UINT16           Index;
   ui32                     m_vertexBufferSize; //! Vertex buffer size in bytes.
   ui32                     m_indexBufferSize;  //! Index buffer size in bytes.
-  ui32                     m_numIndices;       //! Num indices
-  ComPtr<ID3D12Resource>   m_indexBuffer;
-  ComPtr<ID3D12Resource>   m_vertexBuffer;
+  ui32                     m_numTriangleIndices;       //! Num indices for triangle
+  ComPtr<ID3D12Resource>   m_triangleIndexBuffer;
+  ComPtr<ID3D12Resource>   m_triangleVertexBuffer;
   ComPtr<ID3D12Resource>   m_instanceBuffer;
   D3D12_VERTEX_BUFFER_VIEW m_instanceBufferView;
-  D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
-  D3D12_INDEX_BUFFER_VIEW  m_indexBufferView;
+  D3D12_VERTEX_BUFFER_VIEW m_triangleVertexBufferView;
+  D3D12_INDEX_BUFFER_VIEW  m_triangleIndexBufferView;
+
+  // plane
+  ui32 m_numPlaneIndices; //! Num indices for plane
+  ComPtr<ID3D12Resource> m_planeVertexBuffer;
+  ComPtr<ID3D12Resource> m_planeIndexBuffer;
+  D3D12_VERTEX_BUFFER_VIEW m_planeVertexBufferView;
+  D3D12_INDEX_BUFFER_VIEW  m_planeIndexBufferView;
 
   // Init functions
   bool isRayTracingSupported();
